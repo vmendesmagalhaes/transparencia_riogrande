@@ -186,6 +186,14 @@ h2 { font-size: 1.5rem; margin-top: 2.25rem; }
   padding: 0.9rem 1.2rem;
 }
 
+.aviso-fonte {
+  background: #e7f5ee;
+  border: 2px solid var(--verde);
+  border-radius: var(--raio);
+  padding: 0.9rem 1.2rem;
+}
+.alto-contraste .aviso-fonte { background: #fff; border-color: #000; }
+
 .carregando { font-size: 1.25rem; text-align: center; padding: 3rem 0; }
 
 /* ---------- Números do resumo ---------- */

@@ -34,20 +34,25 @@ npm run preview  # testa a versão final
 
 ## De onde vêm os dados
 
-As páginas consomem uma camada de **conectores** (`src/connectors/`) que busca os dados nas APIs do portal GRP da Prefeitura, com cache no navegador e *fallback* automático para uma cópia local (`src/data/amostra.js`) quando a API está indisponível — assim a página nunca fica vazia. Enquanto os endpoints oficiais não forem confirmados, o portal exibe um aviso de **números ilustrativos**.
+Os números de **receitas e despesas são oficiais**, vindos da **API aberta do SICONFI** (Tesouro Nacional) — o RREO de Rio Grande/RS (código IBGE 4315602). O script `scripts/fetch-siconfi.mjs` baixa esses dados e gera `public/dados/transparencia.json`, atualizado automaticamente pelo workflow `.github/workflows/dados.yml` (mensal e sob demanda). O site lê esse JSON estático — sem backend, sem CORS, sem depender de portais bloqueados.
 
-Detalhes da arquitetura, como mapear os endpoints reais e como resolver CORS em produção: [docs/FONTES-DE-DADOS.md](docs/FONTES-DE-DADOS.md).
+> Por que SICONFI e não o portal GRP da Prefeitura? O portal GRP está atrás de um firewall (WAF) que bloqueia acesso automatizado. O SICONFI publica os **mesmos números oficiais** de forma aberta e estável. **Licitações** e **folha de pessoal nominal** não estão no SICONFI — para esses temas, as páginas orientam a consulta oficial em vez de exibir números inventados.
+
+Detalhes da arquitetura e referência técnica dos campos: [docs/FONTES-DE-DADOS.md](docs/FONTES-DE-DADOS.md).
 
 ## Estrutura
 
 ```
-index.html               página única (SPA com rotas por #hash)
-src/main.js              roteador e inicialização
-src/config.js            endereços das fontes e configurações
-src/connectors/          captura e normalização dos dados (GRP + cache + fallback)
-src/data/amostra.js      cópia local de reserva (dados ilustrativos)
-src/pages/               início, receitas, despesas, licitações, servidores, dicionário, ajuda
-src/components/          barra de acessibilidade, VLibras, gráficos acessíveis
-src/styles/main.css      estilos (letras grandes, alto contraste, mobile-first)
-docs/FONTES-DE-DADOS.md  documentação das fontes e dos conectores
+index.html                    página única (SPA com rotas por #hash)
+src/main.js                   roteador e inicialização
+src/config.js                 links das fontes oficiais
+src/connectors/index.js       lê o JSON oficial (fallback para amostra)
+src/data/amostra.js           cópia local de reserva (só se o JSON real faltar)
+src/pages/                    início, receitas, despesas, licitações, servidores, dicionário, ajuda
+src/components/               barra de acessibilidade, VLibras, gráficos acessíveis
+src/styles/main.css           estilos (letras grandes, alto contraste, mobile-first)
+scripts/fetch-siconfi.mjs     captura os dados oficiais do SICONFI
+public/dados/transparencia.json  dados oficiais (gerado pelo script/workflow)
+.github/workflows/dados.yml   atualização automática dos dados
+docs/FONTES-DE-DADOS.md       documentação das fontes
 ```

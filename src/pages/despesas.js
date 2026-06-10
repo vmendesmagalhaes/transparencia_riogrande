@@ -1,11 +1,10 @@
 import { dados } from '../connectors/index.js';
 import { graficoRosca, tabelaAcessivel } from '../components/graficos.js';
 import { dinheiroCurto } from '../utils/formato.js';
-import { config } from '../config.js';
 
 export async function render(container) {
   container.innerHTML = `<p class="carregando" role="status">Buscando os dados de gastos…</p>`;
-  const porArea = await dados.despesasPorArea();
+  const [resumo, porArea] = await Promise.all([dados.resumo(), dados.despesasPorArea()]);
   const total = porArea.reduce((soma, a) => soma + a.valor, 0);
 
   container.innerHTML = `
@@ -19,8 +18,8 @@ export async function render(container) {
     </p>
 
     <section aria-labelledby="t-areas">
-      <h2 id="t-areas">Para onde foi o dinheiro em ${config.anoPadrao}</h2>
-      <p>No total, foram gastos <strong>${dinheiroCurto(total)}</strong>.</p>
+      <h2 id="t-areas">Para onde foi o dinheiro em ${resumo.exercicio}</h2>
+      <p>No total, foram gastos <strong>${dinheiroCurto(resumo.despesaLiquidada)}</strong>.</p>
       <div class="moldura-grafico"><canvas id="grafico-areas" role="img" aria-label="Gráfico mostrando quanto foi gasto em cada área. Os mesmos valores estão na lista abaixo."></canvas></div>
       <ul class="lista-explicada">
         ${porArea.map((a) => {
@@ -38,8 +37,8 @@ export async function render(container) {
     </section>
 
     <p class="link-fonte">
-      Quer ver cada pagamento, fornecedor por fornecedor?
-      <a href="${config.linksOficiais.grp}" target="_blank" rel="noopener">Consulte o portal oficial (abre em nova aba)</a>.
+      Fonte: <strong>${resumo.fonte}</strong> (despesas liquidadas — o que de fato foi gasto).
+      <a href="https://siconfi.tesouro.gov.br/" target="_blank" rel="noopener">Ver no portal do Tesouro Nacional (abre em nova aba)</a>.
     </p>
   `;
 

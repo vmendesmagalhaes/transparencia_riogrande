@@ -1,53 +1,85 @@
 # Fontes de dados e conectores
 
-Hoje as informações da Prefeitura do Rio Grande estão espalhadas em (pelo menos) três endereços, cada um com formato e navegação diferentes:
+## De onde vêm os números (receitas e despesas)
 
-| Endereço | O que tem | Tecnologia |
-|---|---|---|
-| https://grp.riogrande.rs.gov.br/transparencia/prefeitura/#/ | Receitas, despesas, empenhos, licitações, contratos, folha de pessoal, diárias | Sistema GRP (aplicação web que consome APIs REST próprias) |
-| https://transparencia.riogrande.rs.gov.br/ | Página-índice que aponta para os vários sistemas | Página estática / institucional |
-| https://www.riogrande.rs.gov.br/consulta/index.php/portal-transparencia | Informações institucionais, LAI, e-SIC, documentos | CMS institucional (Joomla/PHP) |
+Os valores de **receita** e **despesa** exibidos no site são **oficiais** e vêm da
+**API aberta do SICONFI** (Sistema de Informações Contábeis e Fiscais do Setor
+Público Brasileiro), mantida pelo **Tesouro Nacional**:
 
-Este projeto centraliza tudo em uma única página em linguagem simples. A captura é feita por **conectores** (`src/connectors/`), que isolam cada fonte:
+- Documentação: https://apidatalake.tesouro.gov.br/docs/siconfi/
+- É uma API REST pública, em JSON, **sem necessidade de autenticação**, que cobre
+  todos os municípios brasileiros.
+- Usamos o **RREO** (Relatório Resumido da Execução Orçamentária), publicado a cada
+  bimestre — o mesmo relatório que a Prefeitura é obrigada a entregar por lei.
+- Município: **Rio Grande/RS**, código IBGE **4315602**.
 
-## Arquitetura dos conectores
+### Por que SICONFI e não o portal GRP da Prefeitura?
+
+O portal GRP (`grp.riogrande.rs.gov.br`) está atrás de um **firewall de aplicação
+(WAF SafeLine)** que **bloqueia qualquer acesso automatizado** — responde `403` com
+a mensagem "ACESSO NÃO AUTORIZADO" para qualquer requisição que não venha de um
+navegador real interagindo com a página. Isso impede a captura programática dos
+dados, tanto de um servidor quanto de um robô.
+
+O SICONFI publica **os mesmos números oficiais** (a Prefeitura envia seus relatórios
+para lá) de forma **aberta, estável e sem bloqueio** — por isso é a fonte ideal para
+alimentar este portal automaticamente.
+
+## Como os dados são capturados e atualizados
 
 ```
-páginas (src/pages/*)            ← só conhecem o formato "simples"
+API SICONFI (Tesouro)
+        │  (GitHub Actions, internet livre)
+scripts/fetch-siconfi.mjs        ← baixa o RREO e converte para o formato simples
         │
-src/connectors/index.js          ← fachada: normaliza e escolhe a fonte
+public/dados/transparencia.json  ← dados oficiais versionados no repositório
+        │  (Vite copia para o build)
+src/connectors/index.js          ← o site lê este JSON estático
         │
-   ┌────┴─────────┐
-src/connectors/grp.js        src/data/amostra.js
-(API oficial + cache)        (cópia local de reserva)
+   páginas (receitas, despesas, início)
 ```
 
-1. **`grp.js`** chama as APIs do portal GRP, com cache em `localStorage` (30 min). Se a API falhar, devolve a última resposta boa ou `null`.
-2. **`index.js`** normaliza a resposta bruta para o formato simples das telas. Se receber `null` ou uma estrutura inesperada, usa a amostra local — a página nunca quebra.
-3. **`amostra.js`** guarda dados de exemplo com a mesma estrutura. Enquanto os endpoints reais não forem confirmados, o portal exibe um aviso de "números ilustrativos" (campo `ilustrativo: true`).
+1. **`scripts/fetch-siconfi.mjs`** consulta o SICONFI (RREO Anexo 01 — receitas e
+   balanço; Anexo 02 — despesa por função), descobre o bimestre mais recente com
+   dados publicados, e grava `public/dados/transparencia.json` no formato simples
+   que as telas entendem. Se os dados vierem incompletos, ele **aborta** em vez de
+   publicar números vazios.
+2. **`.github/workflows/dados.yml`** roda esse script (nos servidores do GitHub, que
+   têm internet livre — o sandbox de desenvolvimento não alcança o SICONFI), e faz
+   commit do JSON quando ele muda. Roda manualmente, quando o script muda, e
+   mensalmente (o RREO é bimestral). O commit dispara o deploy.
+3. **`src/connectors/index.js`** apenas carrega esse JSON. Se ele ainda não existir
+   (antes do primeiro run do workflow), cai para uma amostra local com aviso de
+   "ilustrativo", para a página nunca quebrar.
 
-## Como confirmar os endpoints reais do GRP
+### Atualizar os dados manualmente
 
-O ambiente onde este projeto foi gerado não tem acesso de rede aos domínios da Prefeitura, então os caminhos em `grp.js` são *placeholders*. Para mapear os reais:
+Na aba **Actions** do repositório, rode o workflow **"Atualizar dados oficiais
+(SICONFI)"** (botão *Run workflow*). Ele regenera o JSON e, havendo mudança, publica.
 
-1. Abra https://grp.riogrande.rs.gov.br/transparencia/prefeitura/#/ no navegador.
-2. Pressione `F12` → aba **Rede (Network)** → filtre por **XHR/Fetch**.
-3. Navegue por "Receitas", "Despesas", "Licitações" e anote as URLs chamadas e o JSON devolvido.
-4. Atualize o objeto `ENDPOINTS` em `src/connectors/grp.js` e os normalizadores em `src/connectors/index.js`.
-5. Salve uma resposta real de cada endpoint e atualize `src/data/amostra.js` (e remova `ilustrativo: true` quando os dados forem oficiais).
+## O que ainda não é automático
 
-## CORS
+A base aberta do SICONFI cobre **receitas e despesas**. Ela **não inclui**:
 
-As APIs da Prefeitura provavelmente não enviam cabeçalhos CORS para outros domínios. Soluções:
+- **Licitações** (editais, fornecedores, resultados);
+- **Folha de pessoal nominal** (nome, cargo e salário de cada servidor).
 
-- **Em desenvolvimento:** já resolvido — o Vite repassa `/api-grp/*` para `grp.riogrande.rs.gov.br` (ver `vite.config.js`).
-- **Em produção:** configure o mesmo repasse no servidor que hospeda o site (exemplo Nginx):
+Para esses temas não há, hoje, uma fonte de dados aberta e sem bloqueio equivalente.
+Em vez de exibir números inventados, as páginas correspondentes explicam o tema e
+levam a pessoa, em poucos passos, até a consulta oficial no portal da Prefeitura.
+Quando houver uma fonte aberta para esses dados, basta criar um novo conector seguindo
+o mesmo padrão de `fetch-siconfi.mjs`.
 
-  ```nginx
-  location /api-grp/ {
-    proxy_pass https://grp.riogrande.rs.gov.br/transparencia/;
-    proxy_set_header Host grp.riogrande.rs.gov.br;
-  }
-  ```
+## Campos usados do RREO (referência técnica)
 
-  Alternativas: uma função serverless (Cloudflare Workers / Vercel) fazendo o repasse, ou um job agendado que baixa os dados periodicamente e publica JSONs estáticos junto com o site (mais barato e mais rápido para o cidadão).
+Cada item da resposta do SICONFI tem, entre outros: `conta`, `coluna`, `valor`,
+`cod_conta`, `instituicao`, `cod_ibge`, `populacao`, `exercicio`, `periodo`.
+
+- **Receita total realizada**: conta `RECEITAS (EXCETO INTRA-ORÇAMENTÁRIAS) (I)`,
+  coluna contendo `REALIZADAS ATÉ O BIMESTRE` (Anexo 01).
+- **Despesa total liquidada**: conta `DESPESAS (EXCETO INTRA-ORÇAMENTÁRIAS) (I)`,
+  coluna contendo `LIQUIDADAS ATÉ O BIMESTRE` (Anexo 02).
+- **Despesa por área**: contas que são **funções de governo** (lista canônica em
+  `FUNCOES`, dentro do script), evitando contar subfunções em dobro.
+- **Receita por origem**: categorias econômicas (impostos, transferências, etc.),
+  agrupadas em rótulos amigáveis.

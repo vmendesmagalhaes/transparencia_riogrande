@@ -1,15 +1,15 @@
 import { dados } from '../connectors/index.js';
 import { dinheiroCurto, numero, dataBr } from '../utils/formato.js';
 
-// Página inicial: organizada por PERGUNTAS que qualquer pessoa faria,
-// não por jargão técnico ("execução orçamentária", "empenho" etc.).
+// Pagina inicial: organizada por PERGUNTAS que qualquer pessoa faria,
+// nao por jargao tecnico ("execucao orcamentaria", "empenho" etc.).
 
 const CARTOES = [
   {
     rota: '#/receitas',
     icone: '💰',
     titulo: 'Quanto dinheiro entrou?',
-    descricao: 'Veja quanto a Prefeitura arrecadou com impostos e repasses, mês a mês.',
+    descricao: 'Veja quanto a Prefeitura arrecadou com impostos e repasses.',
   },
   {
     rota: '#/despesas',
@@ -21,13 +21,13 @@ const CARTOES = [
     rota: '#/licitacoes',
     icone: '🛒',
     titulo: 'O que a Prefeitura está comprando?',
-    descricao: 'Compras e contratações em andamento, explicadas de forma simples.',
+    descricao: 'Como acompanhar as compras e contratações públicas.',
   },
   {
     rota: '#/servidores',
     icone: '👥',
     titulo: 'Quem trabalha na Prefeitura?',
-    descricao: 'Quantidade de servidores e quanto custa a folha de pagamento.',
+    descricao: 'Como consultar os servidores e seus salários.',
   },
   {
     rota: '#/glossario',
@@ -46,6 +46,7 @@ const CARTOES = [
 export async function render(container) {
   container.innerHTML = `<p class="carregando" role="status">Carregando os números da cidade…</p>`;
   const resumo = await dados.resumo();
+  const sobra = resumo.receitaRealizada - resumo.despesaLiquidada;
 
   container.innerHTML = `
     <section class="hero" aria-labelledby="titulo-hero">
@@ -59,30 +60,35 @@ export async function render(container) {
 
     ${resumo.ilustrativo ? `
       <p class="aviso-amostra" role="note">
-        ⚠️ Estamos em fase de testes: os números abaixo são <strong>exemplos ilustrativos</strong>.
-        Para os valores oficiais, visite o
-        <a href="https://grp.riogrande.rs.gov.br/transparencia/prefeitura/#/" target="_blank" rel="noopener">portal oficial</a>.
-      </p>` : ''}
+        ⚠️ Os dados oficiais ainda não foram carregados neste momento. Os números abaixo são
+        um exemplo. Atualize a página em instantes ou veja a
+        <a href="https://siconfi.tesouro.gov.br/" target="_blank" rel="noopener">fonte oficial</a>.
+      </p>` : `
+      <p class="aviso-fonte" role="note">
+        ✅ Dados oficiais da <strong>${resumo.fonte}</strong>, referentes ao
+        <strong>${resumo.periodoLabel}</strong>. Atualizado em ${dataBr(resumo.atualizadoEm)}.
+      </p>`}
 
-    <section class="painel-resumo" aria-label="Resumo do ano de ${resumo.ano}">
-      <h2>Resumo de ${resumo.ano} <small>(atualizado em ${dataBr(resumo.atualizadoEm)})</small></h2>
+    <section class="painel-resumo" aria-label="Resumo de ${resumo.exercicio}">
+      <h2>Resumo de ${resumo.exercicio}</h2>
       <div class="cartoes-numeros">
         <div class="numero-grande">
-          <span class="valor">${dinheiroCurto(resumo.receitaArrecadada)}</span>
-          <span class="legenda">entraram nos cofres da cidade</span>
+          <span class="valor">${dinheiroCurto(resumo.receitaRealizada)}</span>
+          <span class="legenda">entraram nos cofres da cidade (arrecadação)</span>
         </div>
         <div class="numero-grande">
-          <span class="valor">${dinheiroCurto(resumo.despesaPaga)}</span>
+          <span class="valor">${dinheiroCurto(resumo.despesaLiquidada)}</span>
           <span class="legenda">foram gastos em serviços públicos</span>
         </div>
         <div class="numero-grande">
-          <span class="valor">${numero(resumo.licitacoesAbertas)}</span>
-          <span class="legenda">compras públicas abertas agora</span>
+          <span class="valor">${dinheiroCurto(Math.abs(sobra))}</span>
+          <span class="legenda">${sobra >= 0 ? 'sobraram (entrou mais do que saiu)' : 'a mais foi gasto do que entrou'}</span>
         </div>
+        ${resumo.populacao ? `
         <div class="numero-grande">
-          <span class="valor">${numero(resumo.servidoresAtivos)}</span>
-          <span class="legenda">pessoas trabalham na Prefeitura</span>
-        </div>
+          <span class="valor">${numero(resumo.populacao)}</span>
+          <span class="legenda">moradores na cidade (IBGE)</span>
+        </div>` : ''}
       </div>
     </section>
 

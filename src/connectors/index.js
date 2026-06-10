@@ -1,86 +1,78 @@
-import { config } from '../config.js';
-import { grp } from './grp.js';
 import { amostra } from '../data/amostra.js';
 
-// Fachada única de dados usada pelas páginas.
+// Fachada de dados do site.
 //
-// Regra: tenta o conector da fonte oficial (GRP); se não houver resposta,
-// usa a cópia local em src/data/amostra.js. Assim a página nunca quebra e
-// fica claro para o usuário quando os números são ilustrativos
-// (campo `ilustrativo: true`).
+// A fonte real e o arquivo public/dados/transparencia.json, gerado pelo
+// script scripts/fetch-siconfi.mjs a partir da API aberta do SICONFI
+// (Tesouro Nacional) e atualizado automaticamente pelo workflow
+// .github/workflows/dados.yml. Aqui apenas carregamos esse JSON.
 //
-// Os normalizadores (normalizarReceitas etc.) convertem o formato bruto da
-// API para o formato simples que as telas entendem. Como os contratos das
-// APIs ainda serão confirmados, eles validam o mínimo e desistem com
-// segurança em caso de estrutura inesperada.
+// Se o arquivo ainda nao existir (primeira execucao antes do workflow rodar),
+// caimos para a amostra local com aviso de "ilustrativo", para a pagina nao
+// quebrar. Assim que o JSON real existe, todos os numeros sao oficiais.
 
-function normalizarReceitas(bruto) {
-  if (!Array.isArray(bruto?.meses)) return null;
-  return bruto.meses.map((m) => ({ mes: m.descricao ?? m.mes, valor: Number(m.arrecadado ?? m.valor) || 0 }));
+let cache = null;
+
+async function carregar() {
+  if (cache) return cache;
+  try {
+    const resp = await fetch(new URL('./dados/transparencia.json', document.baseURI), {
+      headers: { Accept: 'application/json' },
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    cache = await resp.json();
+    cache.ilustrativo = false;
+  } catch {
+    cache = { ...amostraComoReal(), ilustrativo: true };
+  }
+  return cache;
 }
 
-function normalizarDespesas(bruto) {
-  if (!Array.isArray(bruto?.funcoes)) return null;
-  return bruto.funcoes.map((f) => ({
-    area: f.descricao ?? f.funcao,
-    valor: Number(f.pago ?? f.valor) || 0,
-    icone: '📋',
-    explicacao: '',
-  }));
-}
-
-function normalizarLicitacoes(bruto) {
-  const lista = Array.isArray(bruto) ? bruto : bruto?.itens;
-  if (!Array.isArray(lista)) return null;
-  return lista.map((l) => ({
-    numero: l.numero ?? l.numeroProcesso ?? '',
-    objeto: l.objeto ?? '',
-    objetoSimples: l.objeto ?? '',
-    modalidade: l.modalidade ?? '',
-    situacao: l.situacao ?? l.status ?? '',
-    valorEstimado: Number(l.valorEstimado ?? l.valor) || 0,
-    dataAbertura: l.dataAbertura ?? l.data ?? '',
-  }));
+// Adapta a amostra antiga ao novo formato (usada so como reserva).
+function amostraComoReal() {
+  return {
+    fonte: 'Amostra local (sem dados oficiais carregados)',
+    fonteUrl: 'https://apidatalake.tesouro.gov.br/docs/siconfi/',
+    instituicao: 'Prefeitura Municipal de Rio Grande - RS',
+    populacao: null,
+    exercicio: amostra.resumo.ano,
+    periodoLabel: `exercício de ${amostra.resumo.ano}`,
+    atualizadoEm: amostra.resumo.atualizadoEm,
+    resumo: {
+      receitaRealizada: amostra.resumo.receitaArrecadada,
+      despesaLiquidada: amostra.resumo.despesaPaga,
+    },
+    receitasPorBimestre: amostra.receitasPorMes
+      .filter((m) => m.valor > 0)
+      .map((m) => ({ rotulo: m.mes, valor: m.valor })),
+    receitasPorOrigem: amostra.receitasPorOrigem,
+    despesasPorArea: amostra.despesasPorArea,
+  };
 }
 
 export const dados = {
-  async resumo(ano = config.anoPadrao) {
-    // O resumo da página inicial combina várias fontes; por ora deriva da
-    // amostra e, quando houver dados reais de receitas, soma a partir deles.
-    const receitas = await this.receitasPorMes(ano);
-    const arrecadado = receitas.reduce((soma, m) => soma + m.valor, 0);
-    const usandoAmostra = receitas === amostra.receitasPorMes;
+  async tudo() {
+    return carregar();
+  },
+  async resumo() {
+    const d = await carregar();
     return {
-      ...amostra.resumo,
-      ano,
-      receitaArrecadada: usandoAmostra ? amostra.resumo.receitaArrecadada : arrecadado,
-      ilustrativo: usandoAmostra,
+      ...d.resumo,
+      exercicio: d.exercicio,
+      periodoLabel: d.periodoLabel,
+      populacao: d.populacao,
+      atualizadoEm: d.atualizadoEm,
+      fonte: d.fonte,
+      ilustrativo: d.ilustrativo,
     };
   },
-
-  async receitasPorMes(ano = config.anoPadrao) {
-    const bruto = await grp.receitas(ano);
-    return normalizarReceitas(bruto) ?? amostra.receitasPorMes;
+  async receitasPorBimestre() {
+    return (await carregar()).receitasPorBimestre;
   },
-
   async receitasPorOrigem() {
-    // Endpoint específico ainda não mapeado; usa a cópia local.
-    return amostra.receitasPorOrigem;
+    return (await carregar()).receitasPorOrigem;
   },
-
-  async despesasPorArea(ano = config.anoPadrao) {
-    const bruto = await grp.despesas(ano);
-    return normalizarDespesas(bruto) ?? amostra.despesasPorArea;
-  },
-
-  async licitacoes(ano = config.anoPadrao) {
-    const bruto = await grp.licitacoes(ano);
-    return normalizarLicitacoes(bruto) ?? amostra.licitacoes;
-  },
-
-  async pessoal(ano = config.anoPadrao) {
-    const bruto = await grp.pessoal(ano);
-    if (bruto?.totalAtivos) return bruto;
-    return amostra.pessoal;
+  async despesasPorArea() {
+    return (await carregar()).despesasPorArea;
   },
 };

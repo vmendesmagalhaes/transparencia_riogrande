@@ -1,12 +1,14 @@
 import { dados } from '../connectors/index.js';
 import { graficoBarras, graficoRosca, tabelaAcessivel } from '../components/graficos.js';
 import { dinheiroCurto } from '../utils/formato.js';
-import { config } from '../config.js';
 
 export async function render(container) {
   container.innerHTML = `<p class="carregando" role="status">Buscando os dados de arrecadação…</p>`;
-  const [porMes, porOrigem] = await Promise.all([dados.receitasPorMes(), dados.receitasPorOrigem()]);
-  const total = porMes.reduce((soma, m) => soma + m.valor, 0);
+  const [resumo, porBimestre, porOrigem] = await Promise.all([
+    dados.resumo(),
+    dados.receitasPorBimestre(),
+    dados.receitasPorOrigem(),
+  ]);
 
   container.innerHTML = `
     <nav aria-label="Você está em"><a href="#/">← Voltar ao início</a></nav>
@@ -18,11 +20,11 @@ export async function render(container) {
       para o município.
     </p>
 
-    <section aria-labelledby="t-mes">
-      <h2 id="t-mes">Mês a mês em ${config.anoPadrao}</h2>
-      <p>Até agora, entraram <strong>${dinheiroCurto(total)}</strong> neste ano.</p>
-      <div class="moldura-grafico"><canvas id="grafico-meses" role="img" aria-label="Gráfico de barras com a arrecadação de cada mês. Os mesmos valores estão disponíveis na tabela abaixo."></canvas></div>
-      ${tabelaAcessivel('Arrecadação por mês', porMes.map((m) => ({ rotulo: m.mes, valor: m.valor })), dinheiroCurto)}
+    <section aria-labelledby="t-bim">
+      <h2 id="t-bim">Arrecadação ao longo de ${resumo.exercicio}</h2>
+      <p>Até o período mais recente, entraram <strong>${dinheiroCurto(resumo.receitaRealizada)}</strong> neste ano.</p>
+      <div class="moldura-grafico"><canvas id="grafico-bim" role="img" aria-label="Gráfico de barras com a arrecadação acumulada a cada bimestre. Os mesmos valores estão na tabela abaixo."></canvas></div>
+      ${tabelaAcessivel('Arrecadação acumulada por bimestre', porBimestre.map((m) => ({ rotulo: m.rotulo, valor: m.valor })), dinheiroCurto)}
     </section>
 
     <section aria-labelledby="t-origem">
@@ -39,15 +41,15 @@ export async function render(container) {
     </section>
 
     <p class="link-fonte">
-      Quer ver cada lançamento em detalhe?
-      <a href="${config.linksOficiais.grp}" target="_blank" rel="noopener">Consulte o portal oficial (abre em nova aba)</a>.
+      Fonte: <strong>${resumo.fonte}</strong>.
+      <a href="https://siconfi.tesouro.gov.br/" target="_blank" rel="noopener">Ver no portal do Tesouro Nacional (abre em nova aba)</a>.
     </p>
   `;
 
   graficoBarras(
-    container.querySelector('#grafico-meses'),
-    porMes.map((m) => m.mes),
-    porMes.map((m) => m.valor),
+    container.querySelector('#grafico-bim'),
+    porBimestre.map((m) => m.rotulo),
+    porBimestre.map((m) => m.valor),
     'Arrecadado',
   );
   graficoRosca(

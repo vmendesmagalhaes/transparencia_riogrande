@@ -1,0 +1,41 @@
+name: Atualizar dados oficiais (SICONFI)
+
+# Baixa os dados reais de Rio Grande/RS da API aberta do SICONFI e atualiza
+# public/dados/transparencia.json. Roda:
+#  - manualmente (workflow_dispatch);
+#  - quando o script de captura muda;
+#  - mensalmente (o RREO e bimestral; checar de tempos em tempos basta).
+# Ao gerar um JSON diferente, faz commit na branch, o que dispara o deploy.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/beautiful-maxwell-a2p6pf]
+    paths: ['scripts/fetch-siconfi.mjs', '.github/workflows/dados.yml']
+  schedule:
+    - cron: '0 6 1 * *' # dia 1 de cada mes, 06:00 UTC
+
+permissions:
+  contents: write
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Capturar dados do SICONFI
+        run: node scripts/fetch-siconfi.mjs
+      - name: Commitar se houve mudanca
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain public/dados)" ]; then
+            git add public/dados/transparencia.json
+            git commit -m "Atualiza dados oficiais do SICONFI (Rio Grande/RS)"
+            git push origin HEAD:${GITHUB_REF_NAME}
+          else
+            echo "Sem mudancas nos dados."
+          fi

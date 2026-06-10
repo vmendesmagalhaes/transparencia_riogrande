@@ -1,71 +1,58 @@
-import { dados } from '../connectors/index.js';
-import { dinheiroCurto, dataBr } from '../utils/formato.js';
 import { config } from '../config.js';
 
-const COR_SITUACAO = {
-  aberta: 'situacao-aberta',
-  'em andamento': 'situacao-andamento',
-  concluída: 'situacao-concluida',
-  concluida: 'situacao-concluida',
-};
+// Licitacoes nao estao na base aberta do SICONFI (que cobre receitas e
+// despesas). Em vez de inventar numeros, explicamos o que sao e levamos a
+// pessoa, em poucos passos, ate a consulta oficial. A integracao automatica
+// entrara aqui quando houver uma fonte de dados aberta para licitacoes.
 
 export async function render(container) {
-  container.innerHTML = `<p class="carregando" role="status">Buscando as compras públicas…</p>`;
-  const licitacoes = await dados.licitacoes();
-
   container.innerHTML = `
     <nav aria-label="Você está em"><a href="#/">← Voltar ao início</a></nav>
     <h1>🛒 O que a Prefeitura está comprando?</h1>
     <p class="explicacao">
       Quando a Prefeitura precisa comprar algo ou contratar um serviço, ela faz uma
-      <strong>licitação</strong>: uma espécie de concurso público entre empresas, em que
-      vence quem oferece a melhor proposta. Isso evita favorecimentos e ajuda a
-      economizar dinheiro público.
+      <strong>licitação</strong>: uma espécie de concurso entre empresas, em que vence
+      quem oferece a melhor proposta. Isso evita favorecimentos e ajuda a economizar
+      dinheiro público.
     </p>
 
-    <div class="filtro-busca">
-      <label for="busca-licitacao">Procurar por palavra (ex.: merenda, asfalto, remédio)</label>
-      <input type="search" id="busca-licitacao" placeholder="Digite o que procura…" />
-    </div>
-
-    <ul class="lista-licitacoes" id="lista-licitacoes" aria-live="polite">
-      ${licitacoes.map(cartaoLicitacao).join('')}
-    </ul>
-
-    <p class="link-fonte">
-      Os documentos completos de cada licitação estão no
-      <a href="${config.linksOficiais.grp}" target="_blank" rel="noopener">portal oficial (abre em nova aba)</a>.
+    <p class="aviso-fonte" role="note">
+      ℹ️ As licitações em detalhe ficam no portal oficial da Prefeitura. Como ainda não há
+      uma fonte de dados aberta para integrá-las automaticamente aqui, preparamos o
+      caminho mais curto para você consultá-las.
     </p>
-  `;
 
-  const campo = container.querySelector('#busca-licitacao');
-  const lista = container.querySelector('#lista-licitacoes');
-  campo.addEventListener('input', () => {
-    const termo = campo.value.trim().toLowerCase();
-    const filtradas = licitacoes.filter((l) =>
-      [l.objeto, l.objetoSimples, l.modalidade, l.situacao, l.numero].join(' ').toLowerCase().includes(termo),
-    );
-    lista.innerHTML = filtradas.length
-      ? filtradas.map(cartaoLicitacao).join('')
-      : `<li class="sem-resultado">Nada encontrado com "${campo.value}". Tente outra palavra.</li>`;
-  });
-}
+    <section aria-labelledby="t-passos">
+      <h2 id="t-passos">Como consultar as compras públicas</h2>
+      <ol class="passo-a-passo">
+        <li>
+          <strong>Abra o portal de transparência da Prefeitura:</strong>
+          <a href="${config.linksOficiais.grp}" target="_blank" rel="noopener">portal oficial (abre em nova aba)</a>.
+        </li>
+        <li>
+          <strong>Procure a seção "Licitações" ou "Compras".</strong>
+          Lá ficam os editais (as regras da compra), os prazos e os resultados.
+        </li>
+        <li>
+          <strong>Use os filtros</strong> por ano, tipo (pregão, concorrência) ou situação
+          (aberta, em andamento, concluída) para achar o que procura.
+        </li>
+        <li>
+          <strong>Não encontrou ou ficou em dúvida?</strong>
+          Você pode pedir a informação diretamente à Prefeitura — veja
+          <a href="#/ajuda">como perguntar à Prefeitura</a>.
+        </li>
+      </ol>
+    </section>
 
-function cartaoLicitacao(l) {
-  const classeSituacao = COR_SITUACAO[l.situacao.toLowerCase()] ?? 'situacao-andamento';
-  return `
-    <li class="cartao-licitacao">
-      <div class="licitacao-topo">
-        <strong class="licitacao-objeto">${l.objetoSimples || l.objeto}</strong>
-        <span class="selo ${classeSituacao}">${l.situacao}</span>
-      </div>
-      ${l.objetoSimples && l.objetoSimples !== l.objeto ? `<p class="licitacao-detalhe">Nome oficial: ${l.objeto}</p>` : ''}
-      <dl class="licitacao-dados">
-        <div><dt>Valor estimado</dt><dd>${dinheiroCurto(l.valorEstimado)}</dd></div>
-        <div><dt>Tipo</dt><dd>${l.modalidade}</dd></div>
-        <div><dt>Data de abertura</dt><dd>${dataBr(l.dataAbertura)}</dd></div>
-        <div><dt>Número</dt><dd>${l.numero}</dd></div>
-      </dl>
-    </li>
+    <section aria-labelledby="t-termos">
+      <h2 id="t-termos">Palavras que você vai encontrar</h2>
+      <ul class="lista-explicada">
+        <li><strong>Edital</strong><p>O documento com as regras da compra: o que será comprado, prazos e condições.</p></li>
+        <li><strong>Pregão</strong><p>O tipo mais comum de licitação, geralmente pela internet. Costuma vencer o menor preço.</p></li>
+        <li><strong>Homologação</strong><p>O momento em que a Prefeitura confirma o vencedor e a compra pode seguir.</p></li>
+      </ul>
+      <p>Veja todos os termos no <a href="#/glossario">dicionário de palavras difíceis</a>.</p>
+    </section>
   `;
 }
