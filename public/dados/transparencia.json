@@ -1,0 +1,92 @@
+{
+  "fonte": "SICONFI - Tesouro Nacional (RREO)",
+  "fonteUrl": "https://apidatalake.tesouro.gov.br/docs/siconfi/",
+  "instituicao": "Prefeitura Municipal de Rio Grande - RS",
+  "populacao": 198935,
+  "exercicio": 2026,
+  "periodo": 2,
+  "periodoLabel": "1º bimestre de 2026",
+  "atualizadoEm": "2026-06-10",
+  "resumo": {
+    "receitaRealizada": 433798067.32,
+    "despesaLiquidada": 312673014.04
+  },
+  "receitasPorBimestre": [
+    {
+      "rotulo": "Até o 1º bim.",
+      "valor": 433798067.32
+    }
+  ],
+  "receitasPorOrigem": [
+    {
+      "origem": "Impostos e taxas pagos na cidade",
+      "valor": 117374268.4,
+      "explicacao": "Dinheiro pago por moradores e empresas da cidade, como IPTU, ISS e ITBI."
+    },
+    {
+      "origem": "Repasses de outros governos",
+      "valor": 237219152.71,
+      "explicacao": "Parte dos impostos federais e estaduais (como FPM e ICMS) que volta para o município."
+    },
+    {
+      "origem": "Serviços, patrimônio e contribuições",
+      "valor": 76564578.13,
+      "explicacao": "Taxas por serviços, aluguéis, rendimentos e contribuições."
+    },
+    {
+      "origem": "Outras receitas",
+      "valor": 2640068.08,
+      "explicacao": "Multas, indenizações, venda de bens e demais receitas."
+    }
+  ],
+  "despesasPorArea": [
+    {
+      "area": "Educação",
+      "valor": 90127791.96,
+      "icone": "🏫",
+      "explicacao": "Escolas, creches, merenda, transporte escolar e salários de professores."
+    },
+    {
+      "area": "Saúde",
+      "valor": 62576362.83,
+      "icone": "🏥",
+      "explicacao": "Postos de saúde, hospitais, remédios e salários de médicos e enfermeiros."
+    },
+    {
+      "area": "Administração",
+      "valor": 52502811.06,
+      "icone": "🏛️",
+      "explicacao": "Funcionamento da Prefeitura: prédios, sistemas e pessoal administrativo."
+    },
+    {
+      "area": "Previdência Social",
+      "valor": 38651225.33,
+      "icone": "👴",
+      "explicacao": "Aposentadorias e pensões dos servidores municipais."
+    },
+    {
+      "area": "Encargos Especiais",
+      "valor": 30091863.51,
+      "icone": "📑",
+      "explicacao": "Dívidas, ressarcimentos e outros encargos obrigatórios."
+    },
+    {
+      "area": "Urbanismo",
+      "valor": 23567683.23,
+      "icone": "🏙️",
+      "explicacao": "Ruas, calçadas, praças, iluminação e cuidado com a cidade."
+    },
+    {
+      "area": "Legislativa",
+      "valor": 9819814.09,
+      "icone": "🏛️",
+      "explicacao": "Câmara de Vereadores e a atividade de fazer leis."
+    },
+    {
+      "area": "Outras áreas",
+      "valor": 5335462.03,
+      "icone": "📋",
+      "explicacao": "Demais áreas com menor participação no orçamento."
+    }
+  ]
+}
