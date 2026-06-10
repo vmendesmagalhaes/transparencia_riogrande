@@ -2,13 +2,17 @@ name: Verificacao dos dados
 
 # Workflow temporario de auditoria: confere o JSON publicado contra a API
 # do SICONFI (recaptura independente) e contra numeros do IBGE para o ano
-# fechado de 2024. Sera removido apos a verificacao.
+# fechado de 2024. Grava o relatorio em docs/AUDITORIA.txt na branch.
+# Sera removido apos a verificacao.
 
 on:
   push:
     branches: [claude/beautiful-maxwell-a2p6pf]
     paths: ['.github/workflows/probe.yml']
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   verificar:
@@ -19,39 +23,41 @@ jobs:
         with:
           node-version: 22
 
-      - name: Recapturar do SICONFI e comparar com o JSON publicado
+      - name: Auditar dados e gravar relatorio
         run: |
           cp public/dados/transparencia.json /tmp/publicado.json
           node scripts/fetch-siconfi.mjs
-          node - <<'EOF'
+          node - <<'EOF' > docs/AUDITORIA.txt
           const fs = require('fs');
           const a = JSON.parse(fs.readFileSync('/tmp/publicado.json'));
           const b = JSON.parse(fs.readFileSync('public/dados/transparencia.json'));
           const iguais = (x, y) => Math.abs(x - y) < 0.01;
-          console.log('=== Recaptura independente vs publicado ===');
-          console.log('Receita publicada :', a.resumo.receitaRealizada.toLocaleString('pt-BR'));
-          console.log('Receita recapturada:', b.resumo.receitaRealizada.toLocaleString('pt-BR'));
-          console.log('Despesa publicada :', a.resumo.despesaLiquidada.toLocaleString('pt-BR'));
-          console.log('Despesa recapturada:', b.resumo.despesaLiquidada.toLocaleString('pt-BR'));
-          console.log('BATEM?', iguais(a.resumo.receitaRealizada, b.resumo.receitaRealizada) &&
-                                iguais(a.resumo.despesaLiquidada, b.resumo.despesaLiquidada) ? 'SIM' : 'NAO');
-          EOF
+          const f = (v) => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
-      - name: Conferir ano fechado 2024 contra numeros do IBGE
-        run: |
-          node - <<'EOF'
-          const BASE = 'https://apidatalake.tesouro.gov.br/ords/siconfi/tt';
-          const ENTE = 4315602;
-          const norm = (s) => (s ?? '').toString().toUpperCase().trim();
-          const pega = (itens, conta, col) => {
-            const i = itens.find((x) => norm(x.conta) === norm(conta) && norm(x.coluna).includes(norm(col)));
-            return i ? Number(i.valor) : 0;
-          };
-          async function rreo(anexo) {
-            const u = `${BASE}/rreo?an_exercicio=2024&nr_periodo=6&co_tipo_demonstrativo=RREO&no_anexo=${encodeURIComponent(anexo)}&id_ente=${ENTE}`;
-            const r = await fetch(u); const j = await r.json(); return j.items ?? [];
-          }
           (async () => {
+            console.log('RELATORIO DE AUDITORIA — gerado em ' + new Date().toISOString());
+            console.log('');
+            console.log('=== 1. Recaptura independente do SICONFI vs JSON publicado ===');
+            console.log('Receita publicada  :', f(a.resumo.receitaRealizada));
+            console.log('Receita recapturada:', f(b.resumo.receitaRealizada));
+            console.log('Despesa publicada  :', f(a.resumo.despesaLiquidada));
+            console.log('Despesa recapturada:', f(b.resumo.despesaLiquidada));
+            const ok1 = iguais(a.resumo.receitaRealizada, b.resumo.receitaRealizada) &&
+                        iguais(a.resumo.despesaLiquidada, b.resumo.despesaLiquidada);
+            console.log('RESULTADO:', ok1 ? 'BATEM' : 'DIVERGEM');
+            console.log('');
+
+            const BASE = 'https://apidatalake.tesouro.gov.br/ords/siconfi/tt';
+            const ENTE = 4315602;
+            const norm = (s) => (s ?? '').toString().toUpperCase().trim();
+            const pega = (itens, conta, col) => {
+              const i = itens.find((x) => norm(x.conta) === norm(conta) && norm(x.coluna).includes(norm(col)));
+              return i ? Number(i.valor) : 0;
+            };
+            const rreo = async (anexo) => {
+              const u = `${BASE}/rreo?an_exercicio=2024&nr_periodo=6&co_tipo_demonstrativo=RREO&no_anexo=${encodeURIComponent(anexo)}&id_ente=${ENTE}`;
+              const r = await fetch(u); const j = await r.json(); return j.items ?? [];
+            };
             const a1 = await rreo('RREO-Anexo 01');
             const a2 = await rreo('RREO-Anexo 02');
             const recExc = pega(a1, 'RECEITAS (EXCETO INTRA-ORÇAMENTÁRIAS) (I)', 'Até o Bimestre');
@@ -60,21 +66,34 @@ jobs:
             const despIntraLiq = pega(a2, 'DESPESAS (INTRA-ORÇAMENTÁRIAS) (II)', 'LIQUIDADAS ATÉ O BIMESTRE');
             const despExcEmp = pega(a2, 'DESPESAS (EXCETO INTRA-ORÇAMENTÁRIAS) (I)', 'EMPENHADAS ATÉ O BIMESTRE');
             const despIntraEmp = pega(a2, 'DESPESAS (INTRA-ORÇAMENTÁRIAS) (II)', 'EMPENHADAS ATÉ O BIMESTRE');
-            const f = (v) => 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits: 2});
-            console.log('=== SICONFI 2024 fechado (6o bim) — Rio Grande/RS ===');
-            console.log('Receita exceto intra:', f(recExc));
-            console.log('Receita total (com intra):', f(recExc + recIntra));
-            console.log('Despesa liquidada exceto intra:', f(despExcLiq));
-            console.log('Despesa liquidada total (com intra):', f(despExcLiq + despIntraLiq));
-            console.log('Despesa empenhada total (com intra):', f(despExcEmp + despIntraEmp));
-            console.log('');
-            console.log('=== Referencia independente (IBGE Cidades, 2024) ===');
-            console.log('Receitas brutas realizadas: R$ 1.297.938.688,55');
-            console.log('Despesas brutas empenhadas: R$ 1.065.264.520,46');
+
+            console.log('=== 2. SICONFI ano fechado 2024 vs IBGE (fonte independente) ===');
+            console.log('Receita 2024 exceto intra      :', f(recExc));
+            console.log('Receita 2024 total (com intra) :', f(recExc + recIntra));
+            console.log('Despesa 2024 liquidada total   :', f(despExcLiq + despIntraLiq));
+            console.log('Despesa 2024 empenhada total   :', f(despExcEmp + despIntraEmp));
+            console.log('IBGE: receitas brutas realizadas 2024: R$ 1.297.938.688,55');
+            console.log('IBGE: despesas brutas empenhadas 2024: R$ 1.065.264.520,46');
             const difRec = Math.abs((recExc + recIntra) - 1297938688.55) / 1297938688.55 * 100;
             const difDesp = Math.abs((despExcEmp + despIntraEmp) - 1065264520.46) / 1065264520.46 * 100;
+            console.log(`Diferenca receita vs IBGE : ${difRec.toFixed(2)}%`);
+            console.log(`Diferenca despesa vs IBGE : ${difDesp.toFixed(2)}%`);
             console.log('');
-            console.log(`Diferenca receita vs IBGE: ${difRec.toFixed(2)}%`);
-            console.log(`Diferenca despesa (empenhada) vs IBGE: ${difDesp.toFixed(2)}%`);
+
+            console.log('=== 3. Consistencia interna do publicado ===');
+            const so = a.receitasPorOrigem.reduce((s, o) => s + o.valor, 0);
+            const sa = a.despesasPorArea.reduce((s, x) => s + x.valor, 0);
+            console.log('Soma origens == receita total :', iguais(so, a.resumo.receitaRealizada) ? 'SIM' : `NAO (${f(so)})`);
+            console.log('Soma areas == despesa total   :', iguais(sa, a.resumo.despesaLiquidada) ? 'SIM' : `NAO (${f(sa)})`);
           })();
           EOF
+          cat docs/AUDITORIA.txt
+
+      - name: Commitar relatorio
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -- public/dados/transparencia.json || true
+          git add docs/AUDITORIA.txt
+          git commit -m "Relatorio de auditoria dos dados"
+          git push origin HEAD:${GITHUB_REF_NAME}
