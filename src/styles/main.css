@@ -1,0 +1,399 @@
+/* =====================================================================
+   Transparência Rio Grande — estilos
+   Princípios: letras grandes, alto contraste, alvos de toque generosos,
+   layout simples de uma coluna, funciona bem em celulares baratos.
+   ===================================================================== */
+
+:root {
+  --azul: #1d6fb8;
+  --azul-escuro: #14507f;
+  --verde: #2c9070;
+  --laranja: #e8742c;
+  --vermelho: #c2483e;
+  --texto: #21272b;
+  --texto-suave: #4a555c;
+  --fundo: #f4f7f9;
+  --branco: #ffffff;
+  --borda: #d7dee3;
+  --sombra: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --raio: 14px;
+}
+
+* { box-sizing: border-box; }
+
+html { font-size: 100%; }
+
+body {
+  margin: 0;
+  font-family: 'Atkinson Hyperlegible', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 1.125rem;
+  line-height: 1.65;
+  color: var(--texto);
+  background: var(--fundo);
+}
+
+/* ---------- Acessibilidade básica ---------- */
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--azul-escuro);
+  color: #fff;
+  padding: 0.75rem 1.25rem;
+  z-index: 100;
+  border-radius: 0 0 var(--raio) 0;
+}
+.skip-link:focus { left: 0; }
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visible {
+  outline: 4px solid var(--laranja);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Modo de alto contraste (botão ◐ na barra) */
+.alto-contraste body, .alto-contraste {
+  --texto: #000;
+  --texto-suave: #111;
+  --fundo: #fff;
+  --borda: #000;
+  --azul: #003d75;
+  --azul-escuro: #002347;
+  --sombra: none;
+}
+.alto-contraste .cartao,
+.alto-contraste .numero-grande,
+.alto-contraste .cartao-licitacao,
+.alto-contraste .termo-glossario { border: 2px solid #000 !important; }
+
+/* Respeita quem configurou o aparelho para reduzir movimento */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+/* ---------- Cabeçalho ---------- */
+
+.site-header {
+  background: var(--azul-escuro);
+  color: #fff;
+  box-shadow: var(--sombra);
+}
+
+.header-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #fff;
+  text-decoration: none;
+}
+.brand-icon { font-size: 2.2rem; }
+.brand-text { display: flex; flex-direction: column; line-height: 1.25; }
+.brand-text strong { font-size: 1.25rem; }
+.brand-text small { opacity: 0.92; font-size: 0.9rem; }
+
+.a11y-toolbar { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.a11y-toolbar button {
+  min-height: 48px;
+  min-width: 48px;
+  padding: 0.4rem 0.9rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  border: 2px solid #fff;
+  border-radius: 10px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+.a11y-toolbar button:hover { background: rgba(255, 255, 255, 0.18); }
+.a11y-toolbar button[aria-pressed='true'] { background: #fff; color: var(--azul-escuro); }
+
+.main-nav { background: var(--azul); }
+.main-nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  list-style: none;
+  margin: 0 auto;
+  padding: 0.4rem 1rem;
+  max-width: 1100px;
+}
+.main-nav a {
+  display: inline-block;
+  padding: 0.65rem 0.9rem;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+  border-radius: 10px;
+}
+.main-nav a:hover { background: rgba(255, 255, 255, 0.16); }
+.main-nav a[aria-current='page'] { background: #fff; color: var(--azul-escuro); }
+
+/* ---------- Conteúdo ---------- */
+
+.content {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+}
+.content:focus { outline: none; }
+
+h1 { font-size: 2rem; line-height: 1.25; margin: 0.5rem 0 1rem; }
+h2 { font-size: 1.5rem; margin-top: 2.25rem; }
+
+.hero { text-align: center; padding: 1rem 0 0.5rem; }
+.hero-sub {
+  max-width: 48rem;
+  margin: 0 auto;
+  color: var(--texto-suave);
+  font-size: 1.2rem;
+}
+
+.explicacao {
+  background: #eaf2fa;
+  border-left: 6px solid var(--azul);
+  border-radius: 0 var(--raio) var(--raio) 0;
+  padding: 1rem 1.25rem;
+  font-size: 1.15rem;
+}
+.alto-contraste .explicacao { background: #fff; border: 2px solid #000; border-left-width: 8px; }
+
+.aviso-amostra {
+  background: #fff6e0;
+  border: 2px solid #d9a514;
+  border-radius: var(--raio);
+  padding: 0.9rem 1.2rem;
+}
+
+.carregando { font-size: 1.25rem; text-align: center; padding: 3rem 0; }
+
+/* ---------- Números do resumo ---------- */
+
+.painel-resumo h2 small { font-weight: 400; color: var(--texto-suave); font-size: 0.95rem; }
+
+.cartoes-numeros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.numero-grande {
+  background: var(--branco);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  padding: 1.4rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.numero-grande .valor { font-size: 1.9rem; font-weight: 800; color: var(--azul-escuro); }
+.numero-grande .legenda { color: var(--texto-suave); }
+
+/* ---------- Cartões de navegação ---------- */
+
+.grade-cartoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-top: 1rem;
+}
+
+.cartao {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: var(--branco);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  padding: 1.5rem;
+  text-decoration: none;
+  color: var(--texto);
+  border: 2px solid transparent;
+  min-height: 44px;
+}
+.cartao:hover { border-color: var(--azul); transform: translateY(-2px); transition: all 0.15s ease; }
+.cartao-icone { font-size: 2.6rem; }
+.cartao-titulo { font-size: 1.35rem; font-weight: 800; color: var(--azul-escuro); }
+.cartao-descricao { color: var(--texto-suave); }
+
+/* ---------- Gráficos e tabelas ---------- */
+
+.moldura-grafico {
+  background: var(--branco);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  padding: 1.25rem;
+  height: 380px;
+  margin: 1rem 0;
+}
+
+.tabela-dados { margin: 1rem 0; }
+.tabela-dados summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--azul-escuro);
+  padding: 0.75rem;
+  min-height: 44px;
+}
+.tabela-dados table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--branco);
+  border-radius: var(--raio);
+  overflow: hidden;
+}
+.tabela-dados th, .tabela-dados td {
+  text-align: left;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--borda);
+}
+.tabela-dados thead th { background: var(--azul-escuro); color: #fff; }
+
+/* ---------- Listas explicadas ---------- */
+
+.lista-explicada { list-style: none; padding: 0; display: grid; gap: 0.75rem; }
+.lista-explicada li {
+  background: var(--branco);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  padding: 1rem 1.25rem;
+}
+.lista-explicada li p { margin: 0.35rem 0 0; color: var(--texto-suave); }
+
+/* ---------- Licitações ---------- */
+
+.filtro-busca { margin: 1.5rem 0; }
+.filtro-busca label { display: block; font-weight: 700; margin-bottom: 0.4rem; }
+.filtro-busca input {
+  width: 100%;
+  max-width: 540px;
+  font-size: 1.15rem;
+  padding: 0.85rem 1rem;
+  border: 2px solid var(--borda);
+  border-radius: 12px;
+  min-height: 52px;
+}
+.filtro-busca input:focus { border-color: var(--azul); }
+
+.lista-licitacoes { list-style: none; padding: 0; display: grid; gap: 1rem; }
+
+.cartao-licitacao {
+  background: var(--branco);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  padding: 1.25rem 1.4rem;
+}
+.licitacao-topo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+}
+.licitacao-objeto { font-size: 1.25rem; color: var(--azul-escuro); }
+.licitacao-detalhe { color: var(--texto-suave); font-size: 1rem; margin: 0.4rem 0 0; }
+
+.selo {
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+.situacao-aberta { background: #def4ea; color: #135c44; border: 2px solid var(--verde); }
+.situacao-andamento { background: #fdeede; color: #8a3d0d; border: 2px solid var(--laranja); }
+.situacao-concluida { background: #e7ebee; color: #39444b; border: 2px solid #5b6770; }
+
+.licitacao-dados {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+}
+.licitacao-dados dt { font-size: 0.95rem; color: var(--texto-suave); }
+.licitacao-dados dd { margin: 0; font-weight: 700; }
+
+.sem-resultado {
+  background: var(--branco);
+  border-radius: var(--raio);
+  padding: 1.5rem;
+  text-align: center;
+}
+
+/* ---------- Glossário ---------- */
+
+.glossario { display: grid; gap: 1rem; margin: 1.5rem 0; }
+.termo-glossario {
+  background: var(--branco);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  padding: 1.25rem 1.4rem;
+}
+.termo-glossario dt { font-size: 1.3rem; font-weight: 800; color: var(--azul-escuro); }
+.termo-glossario dd { margin: 0.5rem 0 0; }
+.termo-glossario .exemplo {
+  background: #eef6f1;
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  margin-top: 0.6rem;
+}
+.alto-contraste .termo-glossario .exemplo { background: #fff; border: 1px solid #000; }
+
+/* ---------- Passo a passo (ajuda) ---------- */
+
+.passo-a-passo { display: grid; gap: 1rem; padding-left: 1.5rem; }
+.passo-a-passo li {
+  background: var(--branco);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  padding: 1rem 1.25rem;
+}
+
+.link-fonte {
+  margin-top: 2.5rem;
+  padding: 1rem 1.25rem;
+  background: #eaf2fa;
+  border-radius: var(--raio);
+}
+.alto-contraste .link-fonte { background: #fff; border: 2px solid #000; }
+
+/* ---------- Rodapé ---------- */
+
+.site-footer {
+  background: var(--azul-escuro);
+  color: #fff;
+  padding: 1.75rem 1.25rem;
+  text-align: center;
+}
+.site-footer a { color: #bcd9f2; }
+.site-footer p { max-width: 60rem; margin: 0.5rem auto; }
+
+/* ---------- Telas pequenas ---------- */
+
+@media (max-width: 600px) {
+  h1 { font-size: 1.6rem; }
+  .moldura-grafico { height: 300px; padding: 0.75rem; }
+  .numero-grande .valor { font-size: 1.55rem; }
+}

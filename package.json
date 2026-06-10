@@ -1,0 +1,24 @@
+{
+  "name": "transparencia-riogrande",
+  "version": "0.1.0",
+  "description": "Portal da Transparência Cidadão de Rio Grande/RS — dados públicos em linguagem simples e acessível para toda a população.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node smoke.test.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vmendesmagalhaes/transparencia_riogrande"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "chart.js": "^4.5.1"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1",
+    "vite": "^8.0.16"
+  }
+}
