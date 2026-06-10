@@ -150,7 +150,15 @@ async function montarParaPeriodo(ano, periodo) {
   const receitaRealizada = valorPorConta(anexo01, 'RECEITAS (EXCETO INTRA-ORÇAMENTÁRIAS) (I)', 'REALIZADAS ATÉ O BIMESTRE');
   const despesaLiquidada = valorPorConta(anexo02, 'DESPESAS (EXCETO INTRA-ORÇAMENTÁRIAS) (I)', 'LIQUIDADAS ATÉ O BIMESTRE');
   const despesasPorArea = montarDespesasPorArea(anexo02);
-  if (!receitaRealizada || !despesaLiquidada || despesasPorArea.length === 0) return null;
+  if (!receitaRealizada || !despesaLiquidada || despesasPorArea.length === 0) {
+    if (process.env.DEBUG_SICONFI) {
+      console.log(`  [debug] receita=${receitaRealizada} despesa=${despesaLiquidada} areas=${despesasPorArea.length}`);
+      console.log('  [debug] colunas Anexo01:', JSON.stringify([...new Set(anexo01.map((i) => i.coluna))]));
+      console.log('  [debug] contas receita I:', JSON.stringify(anexo01.filter((i) => norm(i.conta).includes('EXCETO INTRA')).map((i) => i.conta)));
+      console.log('  [debug] colunas Anexo02:', JSON.stringify([...new Set(anexo02.map((i) => i.coluna))]));
+    }
+    return null;
+  }
 
   const meta = anexo02[0] ?? anexo01[0] ?? {};
   return {
