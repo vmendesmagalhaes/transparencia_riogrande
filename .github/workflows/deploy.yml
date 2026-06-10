@@ -23,6 +23,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # SPA no GitHub Pages: qualquer caminho desconhecido deve servir o app
+      # (e nao a pagina 404 do GitHub).
+      - run: cp dist/index.html dist/404.html
       # Publica o conteúdo de dist/ na branch gh-pages; o GitHub Pages
       # serve essa branch automaticamente.
       - uses: peaceiris/actions-gh-pages@v4
