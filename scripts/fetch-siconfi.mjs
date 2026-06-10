@@ -26,16 +26,14 @@ async function buscarRREO(ano, periodo, anexo) {
   return Array.isArray(json.items) ? json.items : [];
 }
 
-// Descobre o exercicio/periodo mais recente que ja tem dados publicados.
-async function descobrirPeriodoMaisRecente() {
+// Lista candidatos (ano, periodo) do mais recente para o mais antigo.
+function candidatosPeriodo() {
   const anoAtual = new Date().getFullYear();
+  const lista = [];
   for (const ano of [anoAtual, anoAtual - 1, anoAtual - 2]) {
-    for (const periodo of [6, 4, 2]) {
-      const itens = await buscarRREO(ano, periodo, 'RREO-Anexo 02').catch(() => []);
-      if (itens.length > 0) return { ano, periodo };
-    }
+    for (const periodo of [6, 4, 2]) lista.push({ ano, periodo });
   }
-  throw new Error('Nenhum periodo do RREO retornou dados para Rio Grande/RS.');
+  return lista;
 }
 
 const norm = (s) => (s ?? '').toString().toUpperCase().trim();
@@ -140,21 +138,22 @@ async function montarReceitasPorBimestre(ano, periodoMax) {
   return linhas;
 }
 
-async function main() {
-  console.log('Descobrindo periodo mais recente do RREO...');
-  const { ano, periodo } = await descobrirPeriodoMaisRecente();
-  console.log(`Usando exercicio ${ano}, periodo ${periodo}.`);
-
+// Monta o objeto de dados para um (ano, periodo). Devolve null se os dados
+// estiverem incompletos (ex.: ano corrente sem despesa liquidada ainda).
+async function montarParaPeriodo(ano, periodo) {
   const [anexo01, anexo02] = await Promise.all([
-    buscarRREO(ano, periodo, 'RREO-Anexo 01'),
-    buscarRREO(ano, periodo, 'RREO-Anexo 02'),
+    buscarRREO(ano, periodo, 'RREO-Anexo 01').catch(() => []),
+    buscarRREO(ano, periodo, 'RREO-Anexo 02').catch(() => []),
   ]);
+  if (anexo01.length === 0 || anexo02.length === 0) return null;
 
-  const meta = anexo02[0] ?? anexo01[0] ?? {};
   const receitaRealizada = valorPorConta(anexo01, 'RECEITAS (EXCETO INTRA-ORÇAMENTÁRIAS) (I)', 'REALIZADAS ATÉ O BIMESTRE');
   const despesaLiquidada = valorPorConta(anexo02, 'DESPESAS (EXCETO INTRA-ORÇAMENTÁRIAS) (I)', 'LIQUIDADAS ATÉ O BIMESTRE');
+  const despesasPorArea = montarDespesasPorArea(anexo02);
+  if (!receitaRealizada || !despesaLiquidada || despesasPorArea.length === 0) return null;
 
-  const dados = {
+  const meta = anexo02[0] ?? anexo01[0] ?? {};
+  return {
     fonte: 'SICONFI - Tesouro Nacional (RREO)',
     fonteUrl: 'https://apidatalake.tesouro.gov.br/docs/siconfi/',
     instituicao: meta.instituicao ?? 'Prefeitura Municipal de Rio Grande - RS',
@@ -163,24 +162,33 @@ async function main() {
     periodo,
     periodoLabel: `${periodo / 2}º bimestre de ${ano}`,
     atualizadoEm: new Date().toISOString().slice(0, 10),
-    resumo: {
-      receitaRealizada,
-      despesaLiquidada,
-    },
+    resumo: { receitaRealizada, despesaLiquidada },
     receitasPorBimestre: await montarReceitasPorBimestre(ano, periodo),
     receitasPorOrigem: montarReceitasPorOrigem(anexo01),
-    despesasPorArea: montarDespesasPorArea(anexo02),
+    despesasPorArea,
   };
+}
 
-  if (!receitaRealizada || !despesaLiquidada || dados.despesasPorArea.length === 0) {
-    throw new Error('Dados incompletos do SICONFI — abortando para nao publicar numeros vazios.');
+async function main() {
+  console.log('Procurando o periodo mais recente do RREO com dados completos...');
+  let dados = null;
+  for (const { ano, periodo } of candidatosPeriodo()) {
+    dados = await montarParaPeriodo(ano, periodo);
+    if (dados) {
+      console.log(`Usando exercicio ${ano}, periodo ${periodo}.`);
+      break;
+    }
+    console.log(`  ${ano}/${periodo}: sem dados completos, tentando anterior...`);
+  }
+  if (!dados) {
+    throw new Error('Nenhum periodo do RREO retornou dados completos para Rio Grande/RS.');
   }
 
   await mkdir('public/dados', { recursive: true });
   await writeFile('public/dados/transparencia.json', JSON.stringify(dados, null, 2) + '\n');
   console.log('OK: public/dados/transparencia.json gerado.');
-  console.log(`  Receita realizada: R$ ${receitaRealizada.toLocaleString('pt-BR')}`);
-  console.log(`  Despesa liquidada: R$ ${despesaLiquidada.toLocaleString('pt-BR')}`);
+  console.log(`  Receita realizada: R$ ${dados.resumo.receitaRealizada.toLocaleString('pt-BR')}`);
+  console.log(`  Despesa liquidada: R$ ${dados.resumo.despesaLiquidada.toLocaleString('pt-BR')}`);
   console.log(`  Areas de despesa: ${dados.despesasPorArea.length}`);
 }
 
