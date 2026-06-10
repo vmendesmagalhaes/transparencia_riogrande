@@ -93,7 +93,7 @@ function montarDespesasPorArea(anexo02) {
 }
 
 function montarReceitasPorOrigem(anexo01) {
-  const COL = 'REALIZADAS ATÉ O BIMESTRE';
+  const COL = 'Até o Bimestre';
   const grupos = [
     {
       origem: 'Impostos e taxas pagos na cidade',
@@ -128,7 +128,7 @@ function montarReceitasPorOrigem(anexo01) {
 
 async function montarReceitasPorBimestre(ano, periodoMax) {
   const CONTA = 'RECEITAS (EXCETO INTRA-ORÇAMENTÁRIAS) (I)';
-  const COL = 'REALIZADAS ATÉ O BIMESTRE';
+  const COL = 'Até o Bimestre';
   const linhas = [];
   for (let p = 2; p <= periodoMax; p += 2) {
     const itens = await buscarRREO(ano, p, 'RREO-Anexo 01').catch(() => []);
@@ -147,7 +147,7 @@ async function montarParaPeriodo(ano, periodo) {
   ]);
   if (anexo01.length === 0 || anexo02.length === 0) return null;
 
-  const receitaRealizada = valorPorConta(anexo01, 'RECEITAS (EXCETO INTRA-ORÇAMENTÁRIAS) (I)', 'REALIZADAS ATÉ O BIMESTRE');
+  const receitaRealizada = valorPorConta(anexo01, 'RECEITAS (EXCETO INTRA-ORÇAMENTÁRIAS) (I)', 'Até o Bimestre');
   const despesaLiquidada = valorPorConta(anexo02, 'DESPESAS (EXCETO INTRA-ORÇAMENTÁRIAS) (I)', 'LIQUIDADAS ATÉ O BIMESTRE');
   const despesasPorArea = montarDespesasPorArea(anexo02);
   if (!receitaRealizada || !despesaLiquidada || despesasPorArea.length === 0) {
