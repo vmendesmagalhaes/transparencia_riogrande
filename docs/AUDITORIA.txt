@@ -1,0 +1,22 @@
+RELATORIO DE AUDITORIA — gerado em 2026-06-10T10:41:03.215Z
+
+=== 1. Recaptura independente do SICONFI vs JSON publicado ===
+Receita publicada  : R$ 433.798.067,32
+Receita recapturada: R$ 433.798.067,32
+Despesa publicada  : R$ 312.673.014,04
+Despesa recapturada: R$ 312.673.014,04
+RESULTADO: BATEM
+
+=== 2. SICONFI ano fechado 2024 vs IBGE (fonte independente) ===
+Receita 2024 exceto intra      : R$ 1.210.470.568,41
+Receita 2024 total (com intra) : R$ 1.332.344.129,86
+Despesa 2024 liquidada total   : R$ 1.010.487.113,42
+Despesa 2024 empenhada total   : R$ 1.065.264.520,46
+IBGE: receitas brutas realizadas 2024: R$ 1.297.938.688,55
+IBGE: despesas brutas empenhadas 2024: R$ 1.065.264.520,46
+Diferenca receita vs IBGE : 2.65%
+Diferenca despesa vs IBGE : 0.00%
+
+=== 3. Consistencia interna do publicado ===
+Soma origens == receita total : SIM
+Soma areas == despesa total   : SIM
