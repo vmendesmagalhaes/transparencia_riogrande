@@ -1,0 +1,85 @@
+name: Sonda GRP navegador
+
+# Tenta acessar o portal GRP com um navegador REAL (Chromium/Playwright), que
+# executa o desafio JavaScript do WAF SafeLine. Captura as chamadas internas de
+# dados que a aplicacao faz. Temporario.
+
+on:
+  push:
+    branches: [claude/beautiful-maxwell-a2p6pf]
+    paths: ['.github/workflows/probe.yml']
+  workflow_dispatch:
+
+jobs:
+  sonda:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Instalar Playwright + Chromium
+        run: npm i -D playwright@latest && npx playwright install --with-deps chromium
+
+      - name: Abrir o GRP com navegador real e capturar tudo
+        run: |
+          cat > drive.mjs <<'EOF'
+          import { chromium } from 'playwright';
+
+          const ALVO = 'https://grp.riogrande.rs.gov.br/transparencia/prefeitura/#/';
+          const browser = await chromium.launch();
+          const ctx = await browser.newContext({
+            locale: 'pt-BR',
+            timezoneId: 'America/Sao_Paulo',
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+          });
+          const page = await ctx.newPage();
+
+          const chamadas = [];
+          page.on('response', async (resp) => {
+            const u = resp.url();
+            if (!u.includes('grp.riogrande.rs.gov.br')) return;
+            const ct = (resp.headers()['content-type'] || '').split(';')[0];
+            let amostra = '';
+            if (ct.includes('json')) {
+              try { amostra = (await resp.text()).slice(0, 300); } catch {}
+            }
+            chamadas.push({ status: resp.status(), ct, url: u, amostra });
+          });
+
+          let erro = '';
+          try {
+            await page.goto(ALVO, { waitUntil: 'networkidle', timeout: 60000 });
+            // SafeLine costuma recarregar apos resolver o desafio JS; espera um pouco.
+            await page.waitForTimeout(8000);
+          } catch (e) { erro = e.message; }
+
+          const titulo = await page.title().catch(() => '');
+          const corpo = (await page.content().catch(() => '')) || '';
+          const ehWaf = corpo.includes('ACESSO NÃO AUTORIZADO') || corpo.includes('SafeLine') || corpo.includes('slg-bg');
+          const textoVisivel = (await page.evaluate(() => document.body && document.body.innerText || '').catch(() => '')).slice(0, 600);
+
+          console.log('=== RESULTADO ===');
+          console.log('erro navegacao:', erro || '(nenhum)');
+          console.log('titulo:', JSON.stringify(titulo));
+          console.log('parece pagina do WAF (bloqueio)?', ehWaf ? 'SIM' : 'NAO');
+          console.log('tamanho do HTML:', corpo.length);
+          console.log('--- texto visivel na tela (inicio) ---');
+          console.log(textoVisivel);
+          console.log('--- chamadas para grp.riogrande (' + chamadas.length + ') ---');
+          for (const c of chamadas) {
+            console.log(`[${c.status}] ${c.ct}  ${c.url}`);
+            if (c.amostra) console.log('     json:', c.amostra.replace(/\n/g, ' '));
+          }
+
+          // Tenta navegar para uma rota de dados (receitas) e capturar mais chamadas.
+          console.log('--- tentando rota #/receita ... ---');
+          try {
+            await page.goto('https://grp.riogrande.rs.gov.br/transparencia/prefeitura/#/receita', { waitUntil: 'networkidle', timeout: 45000 });
+            await page.waitForTimeout(6000);
+          } catch (e) { console.log('erro rota:', e.message); }
+          console.log('total de chamadas capturadas agora:', chamadas.length);
+          for (const c of chamadas.slice(-15)) console.log(`[${c.status}] ${c.ct}  ${c.url}`);
+
+          await browser.close();
+          EOF
+          node drive.mjs
