@@ -1,8 +1,5 @@
 name: Sonda diarias
 
-# Testa o endpoint de diarias (api/consultadiarias) com a sessao estabelecida.
-# Temporario.
-
 on:
   push:
     branches: [claude/beautiful-maxwell-a2p6pf]
@@ -13,7 +10,7 @@ jobs:
   sonda:
     runs-on: ubuntu-latest
     steps:
-      - name: Handshake + consulta de diarias
+      - name: Varrer todas as competencias de diarias
         run: |
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
           B="https://transparencia.riogrande.rs.gov.br/rhsysportaltransp"
@@ -21,40 +18,25 @@ jobs:
           cj() { curl -s --compressed -A "$UA" -c $J -b $J -H "Accept-Language: pt-BR" -H "Referer: $B/" "$@"; }
           api() { cj -H "Accept: application/json, text/plain, */*" "$@"; }
 
-          echo "=== handshake ==="
           cj -o /dev/null --max-time 30 "$B/"
           api --max-time 30 "$B/api/tracking/check-config" -o /dev/null
-
-          echo "=== ler controller de diarias (parametros) ==="
-          cj --max-time 40 "$B/consultadiarias/consultadiarias.controller.js?v=4.3.1" \
-            | tr ';,' '\n\n' | grep -iE "api/|\\\$resource|\\\$http|referencia|filtro|page|rows|lov" | head -40 || true
-
-          echo "=== competencias disponiveis (lov/referencia) ==="
           api --max-time 30 "$B/api/lov/referencia" -o /tmp/ref.json
-          head -c 300 /tmp/ref.json; echo ""
 
-          echo "=== consultadiarias: variacoes ==="
-          for p in \
-            "/api/consultadiarias" \
-            "/api/consultadiarias?page=1&rows=5" \
-            "/api/consultadiarias/folha?page=1&rows=5" ; do
-            code=$(api -w "%{http_code}" --max-time 30 "$B$p" -o /tmp/d.json)
-            echo ">>> $p -> $code ($(wc -c < /tmp/d.json) b)"
-            head -c 600 /tmp/d.json; echo ""; echo "----"
-          done
+          echo "=== total de competencias disponiveis ==="
+          node -e "const d=require('/tmp/ref.json'); console.log((d.dados||[]).length, 'competencias; mais antiga:', (d.dados||[]).slice(-1)[0]?.descricao)"
 
-          echo "=== consultadiarias com referencia (cada competencia recente) ==="
-          node -e "
-            const fs=require('fs');
-            let refs=[];
-            try{refs=(JSON.parse(fs.readFileSync('/tmp/ref.json')).dados||[]).slice(0,3);}catch(e){}
-            console.log(JSON.stringify(refs));
-          " > /tmp/refs.json
-          cat /tmp/refs.json
-          for ref in $(node -e "const r=require('/tmp/refs.json'); r.forEach(x=>console.log(encodeURIComponent(x.codigo)))"); do
-            for q in "referencia" "competencia" "dataReferencia" "data"; do
-              code=$(api -w "%{http_code}" --max-time 30 "$B/api/consultadiarias?$q=$ref&page=1&rows=5" -o /tmp/d.json)
-              echo ">>> consultadiarias?$q=$ref -> $code ($(wc -c < /tmp/d.json) b)"
-              if [ "$code" = "200" ]; then head -c 700 /tmp/d.json; echo ""; fi
-            done
-          done
+          echo "=== consultando diarias em CADA competencia (referencia) ==="
+          ENC=$(node -e "const d=require('/tmp/ref.json'); (d.dados||[]).forEach(x=>console.log(x.descricao+'|'+encodeURIComponent(x.codigo)))")
+          ACHOU=0
+          while IFS='|' read -r desc code; do
+            [ -z "$code" ] && continue
+            api -w "" --max-time 30 "$B/api/consultadiarias?referencia=$code&page=1&rows=5" -o /tmp/d.json
+            c=$(node -e "try{console.log(require('/tmp/d.json').count)}catch(e){console.log('err')}")
+            echo "$desc -> count=$c"
+            if [ "$c" != "0" ] && [ "$c" != "err" ]; then
+              ACHOU=1
+              echo "    >>> TEM DADOS! amostra:"
+              head -c 900 /tmp/d.json; echo ""
+            fi
+          done <<< "$ENC"
+          echo "=== ALGUMA COMPETENCIA COM DIARIAS? ACHOU=$ACHOU ==="
