@@ -20,6 +20,8 @@ const areas = await dados.despesasPorArea();
 console.assert(Array.isArray(areas) && areas.length >= 1, 'despesas por area');
 const origem = await dados.receitasPorOrigem();
 console.assert(Array.isArray(origem) && origem.length >= 1, 'receitas por origem');
+const srv = await dados.servidores();
+console.assert(srv === null, 'servidores() devolve null com segurança quando o JSON não existe');
 
 const main = document.getElementById('conteudo');
 for (const nome of ['inicio', 'receitas', 'despesas', 'licitacoes', 'servidores', 'glossario', 'ajuda']) {

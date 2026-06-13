@@ -75,4 +75,21 @@ export const dados = {
   async despesasPorArea() {
     return (await carregar()).despesasPorArea;
   },
+  // Relacao de servidores (portal de pessoal). Retorna null se o JSON ainda
+  // nao foi gerado, para a pagina mostrar o estado de "ainda nao disponivel".
+  async servidores() {
+    if (servidoresCache !== undefined) return servidoresCache;
+    try {
+      const resp = await fetch(new URL('./dados/servidores.json', document.baseURI), {
+        headers: { Accept: 'application/json' },
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      servidoresCache = await resp.json();
+    } catch {
+      servidoresCache = null;
+    }
+    return servidoresCache;
+  },
 };
+
+let servidoresCache;

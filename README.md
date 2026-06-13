@@ -36,7 +36,9 @@ npm run preview  # testa a versão final
 
 Os números de **receitas e despesas são oficiais**, vindos da **API aberta do SICONFI** (Tesouro Nacional) — o RREO de Rio Grande/RS (código IBGE 4315602). O script `scripts/fetch-siconfi.mjs` baixa esses dados e gera `public/dados/transparencia.json`, atualizado automaticamente pelo workflow `.github/workflows/dados.yml` (mensal e sob demanda). O site lê esse JSON estático — sem backend, sem CORS, sem depender de portais bloqueados.
 
-> Por que SICONFI e não o portal GRP da Prefeitura? O portal GRP está atrás de um firewall (WAF) que bloqueia acesso automatizado. O SICONFI publica os **mesmos números oficiais** de forma aberta e estável. **Licitações** e **folha de pessoal nominal** não estão no SICONFI — para esses temas, as páginas orientam a consulta oficial em vez de exibir números inventados.
+> Por que SICONFI e não o portal GRP da Prefeitura? O portal GRP está atrás de um firewall (WAF) que bloqueia acesso automatizado. O SICONFI publica os **mesmos números oficiais** de forma aberta e estável.
+
+A **relação de servidores** (nome, cargo, órgão, vínculo, admissão) é capturada diretamente do portal de pessoal da Prefeitura (`rhsysportaltransp`), via `scripts/fetch-rhsys.mjs` → `public/dados/servidores.json`. Os **salários** não estão disponíveis nesse portal (endpoint desativado), e **licitações** não têm fonte aberta — nesses casos o site orienta a consulta oficial em vez de inventar números.
 
 Detalhes da arquitetura e referência técnica dos campos: [docs/FONTES-DE-DADOS.md](docs/FONTES-DE-DADOS.md).
 

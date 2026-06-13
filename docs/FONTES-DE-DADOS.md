@@ -57,18 +57,43 @@ src/connectors/index.js          ← o site lê este JSON estático
 Na aba **Actions** do repositório, rode o workflow **"Atualizar dados oficiais
 (SICONFI)"** (botão *Run workflow*). Ele regenera o JSON e, havendo mudança, publica.
 
+## Relação de servidores (portal de pessoal da Prefeitura)
+
+Além do SICONFI, capturamos a **relação real de servidores** diretamente de um
+portal da própria Prefeitura: o **rhsysportaltransp**, em
+`https://transparencia.riogrande.rs.gov.br/rhsysportaltransp/`.
+
+- É uma aplicação AngularJS que consome uma API REST JSON própria.
+- Diferente do portal financeiro GRP (bloqueado por WAF), este **não bloqueia**
+  acesso automatizado: basta um *handshake* de sessão, **sem captcha** — a própria
+  configuração do portal informa `exigeCaptcha: "N"`.
+
+Fluxo do conector (`scripts/fetch-rhsys.mjs`):
+
+1. `GET /rhsysportaltransp/` → recebe o cookie inicial (`INGRESSCOOKIE`);
+2. `GET /api/tracking/check-config` → recebe o cookie de sessão (`JSESSIONID`);
+3. `GET /api/relacaoservidores?page=N&rows=25` → 25 servidores por página; o
+   script pagina até obter todos (campo `count` informa o total).
+
+O script agrega por **vínculo**, por **órgão/secretaria** e por **cargo**, e gera
+`public/dados/servidores.json` (com uma lista compacta nome/cargo/órgão/vínculo/
+admissão para a busca no site).
+
+### O que NÃO é extraível aqui
+
+- **Salários (remuneração)**: o endpoint `api/remuneracaoportal` responde **HTTP 500**
+  nesta instalação (recurso desativado: `exportEnabled:"N"`, `tipoFolhaEnabled:"N"`).
+  Por isso o site mostra a relação de servidores **sem** valores de salário, em vez
+  de inventar números.
+
 ## O que ainda não é automático
 
-A base aberta do SICONFI cobre **receitas e despesas**. Ela **não inclui**:
+- **Licitações** (editais, fornecedores, resultados): não há fonte aberta sem
+  bloqueio. A página correspondente explica o tema e leva à consulta oficial.
 
-- **Licitações** (editais, fornecedores, resultados);
-- **Folha de pessoal nominal** (nome, cargo e salário de cada servidor).
-
-Para esses temas não há, hoje, uma fonte de dados aberta e sem bloqueio equivalente.
-Em vez de exibir números inventados, as páginas correspondentes explicam o tema e
-levam a pessoa, em poucos passos, até a consulta oficial no portal da Prefeitura.
-Quando houver uma fonte aberta para esses dados, basta criar um novo conector seguindo
-o mesmo padrão de `fetch-siconfi.mjs`.
+O portal financeiro **GRP** (`grp.riogrande.rs.gov.br`) permanece inacessível de
+forma automatizada por causa do WAF SafeLine (responde `403` a qualquer requisição,
+inclusive nos endpoints de API), por isso usamos o SICONFI para receitas/despesas.
 
 ## Campos usados do RREO (referência técnica)
 

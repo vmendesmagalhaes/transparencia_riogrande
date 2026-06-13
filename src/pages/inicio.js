@@ -27,7 +27,7 @@ const CARTOES = [
     rota: '#/servidores',
     icone: '👥',
     titulo: 'Quem trabalha na Prefeitura?',
-    descricao: 'Como consultar os servidores e seus salários.',
+    descricao: 'Pesquise os servidores por nome, cargo ou secretaria.',
   },
   {
     rota: '#/glossario',

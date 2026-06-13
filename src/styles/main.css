@@ -350,6 +350,20 @@ h2 { font-size: 1.5rem; margin-top: 2.25rem; }
   text-align: center;
 }
 
+.lista-servidores { list-style: none; padding: 0; display: grid; gap: 0.75rem; margin-top: 1rem; }
+.cartao-servidor {
+  background: var(--branco);
+  border-radius: var(--raio);
+  box-shadow: var(--sombra);
+  padding: 0.9rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.cartao-servidor strong { color: var(--azul-escuro); font-size: 1.1rem; }
+.cartao-servidor span { color: var(--texto); }
+.cartao-servidor small { color: var(--texto-suave); }
+
 /* ---------- Glossário ---------- */
 
 .glossario { display: grid; gap: 1rem; margin: 1.5rem 0; }

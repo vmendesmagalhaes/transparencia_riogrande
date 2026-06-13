@@ -1,17 +1,21 @@
-name: Atualizar dados oficiais (SICONFI)
+name: Atualizar dados oficiais
 
-# Baixa os dados reais de Rio Grande/RS da API aberta do SICONFI e atualiza
-# public/dados/transparencia.json. Roda:
-#  - manualmente (workflow_dispatch);
-#  - quando o script de captura muda;
-#  - mensalmente (o RREO e bimestral; checar de tempos em tempos basta).
-# Ao gerar um JSON diferente, faz commit na branch, o que dispara o deploy.
+# Captura os dados reais de Rio Grande/RS e atualiza os JSON em public/dados:
+#  - transparencia.json: receitas e despesas, da API aberta do SICONFI
+#    (Tesouro Nacional).
+#  - servidores.json: relacao de servidores, do portal de pessoal da
+#    Prefeitura (rhsysportaltransp).
+# Roda manualmente, quando um script de captura muda, e mensalmente.
+# Ao gerar JSON diferente, faz commit na branch, o que dispara o deploy.
 
 on:
   workflow_dispatch:
   push:
     branches: [claude/beautiful-maxwell-a2p6pf]
-    paths: ['scripts/fetch-siconfi.mjs', '.github/workflows/dados.yml']
+    paths:
+      - 'scripts/fetch-siconfi.mjs'
+      - 'scripts/fetch-rhsys.mjs'
+      - '.github/workflows/dados.yml'
   schedule:
     - cron: '0 6 1 * *' # dia 1 de cada mes, 06:00 UTC
 
@@ -26,15 +30,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Capturar dados do SICONFI
+
+      - name: Capturar receitas e despesas (SICONFI)
         run: node scripts/fetch-siconfi.mjs
+
+      - name: Capturar relacao de servidores (portal de pessoal)
+        run: node scripts/fetch-rhsys.mjs
+        continue-on-error: true # se o portal de pessoal estiver fora do ar, nao trava o resto
+
       - name: Commitar se houve mudanca
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if [ -n "$(git status --porcelain public/dados)" ]; then
-            git add public/dados/transparencia.json
-            git commit -m "Atualiza dados oficiais do SICONFI (Rio Grande/RS)"
+            git add public/dados/*.json
+            git commit -m "Atualiza dados (SICONFI + relacao de servidores)"
             git push origin HEAD:${GITHUB_REF_NAME}
           else
             echo "Sem mudancas nos dados."
