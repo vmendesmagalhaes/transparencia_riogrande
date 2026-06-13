@@ -1,7 +1,7 @@
 name: Sonda portais RG
 
-# Testa a API REAL do portal de pessoal rhsysportaltransp (sem WAF) e le os
-# controllers para descobrir os parametros. Temporario.
+# Entende como a sessao do rhsysportaltransp e criada (token/cookie/captcha)
+# e tenta o handshake completo para acessar os dados publicos. Temporario.
 
 on:
   push:
@@ -13,60 +13,46 @@ jobs:
   sonda:
     runs-on: ubuntu-latest
     steps:
-      - name: Ler controllers (parametros das chamadas)
+      - name: Ler config/services para achar token/sessao/interceptor
         run: |
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
           B="https://transparencia.riogrande.rs.gov.br/rhsysportaltransp"
           G() { curl -s --compressed -A "$UA" -H "Accept-Language: pt-BR" "$@"; }
-          for c in relacaoservidores/relacaoservidores.controller.js remuneracaoportal/remuneracaoportal.controller.js services/services.module.js; do
+          for c in app.config.js app.values.js services/tracking.service.js services/services.module.js; do
             echo "===================== $c ====================="
-            G --max-time 40 "$B/$c?v=4.3.1" | tr ';' '\n' | grep -iE "api/|\\\$http|params|exercicio|competenc|mes|ano|page|rows|filtro" | head -40 || true
+            G --max-time 40 "$B/$c?v=4.3.1" | tr ';,' '\n\n' | grep -iE "token|sessao|sess|header|interceptor|cookie|register|recaptcha|x-|authorization|config\(" | head -50 || true
           done
 
-      - name: Testar a API real (base /rhsysportaltransp/api)
+      - name: Handshake completo (cookie jar) e tentar dados
         run: |
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
           B="https://transparencia.riogrande.rs.gov.br/rhsysportaltransp"
-          api() { curl -s --compressed -A "$UA" -H "Accept: application/json, text/plain, */*" -H "Accept-Language: pt-BR" -H "Referer: $B/" "$@"; }
-          mkdir -p out
-          for p in \
-            "/api/traducao" \
-            "/api/remuneracaoportal/metadados" \
-            "/api/filtros/" \
-            "/api/lov/" \
-            "/api/relacaoservidores" \
-            "/api/relacaoservidores/folha" \
-            "/api/remuneracaoportal" \
-            "/api/consultadiarias" ; do
-            code=$(api -o "out/resp.json" -w "%{http_code} %{content_type}" --max-time 30 "$B$p")
-            echo ">>> $p  -> $code  ($(wc -c < out/resp.json) bytes)"
-            head -c 700 out/resp.json; echo ""; echo "----"
+          J=/tmp/jar.txt; rm -f $J
+          cj() { curl -s --compressed -A "$UA" -c $J -b $J -H "Accept-Language: pt-BR" -H "Referer: $B/" "$@"; }
+
+          echo "=== 1) GET app (pega cookies iniciais) ==="
+          cj -o /dev/null -D /tmp/h1.txt -w "HTTP=%{http_code}\n" --max-time 30 "$B/"
+          grep -i "set-cookie" /tmp/h1.txt || echo "(sem set-cookie no GET inicial)"
+
+          echo "=== 2) GET api/tracking/check-config ==="
+          cj -D /tmp/h2.txt -w "HTTP=%{http_code}\n" --max-time 30 "$B/api/tracking/check-config" -o /tmp/cc.json
+          grep -i "set-cookie" /tmp/h2.txt || echo "(sem set-cookie)"
+          head -c 400 /tmp/cc.json; echo ""
+
+          echo "=== 3) POST api/tracking/register-user (varios corpos) ==="
+          for body in '{}' '{"aceitouTermos":true}' '{"identificado":false}' '{"tipoUsuario":"ANONIMO"}'; do
+            code=$(cj -X POST -H "Content-Type: application/json" -d "$body" -D /tmp/h3.txt -w "%{http_code}" --max-time 30 "$B/api/tracking/register-user" -o /tmp/ru.json)
+            echo ">>> body=$body -> $code"
+            grep -i "set-cookie" /tmp/h3.txt || true
+            head -c 300 /tmp/ru.json; echo ""
           done
 
-      - name: Testar remuneracaoportal com parametros comuns
-        run: |
-          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-          B="https://transparencia.riogrande.rs.gov.br/rhsysportaltransp"
-          api() { curl -s --compressed -A "$UA" -H "Accept: application/json, text/plain, */*" -H "Referer: $B/" "$@"; }
-          for qs in \
-            "?page=1&rows=5" \
-            "?competencia=202604&page=1&rows=5" \
-            "?anoMes=202604&page=1&rows=5" \
-            "?exercicio=2026&mes=4&page=1&rows=5" \
-            "?ano=2026&mes=4&page=1&rows=5" ; do
-            code=$(api -o out/r.json -w "%{http_code}" --max-time 30 "$B/api/remuneracaoportal$qs")
-            echo ">>> remuneracaoportal$qs -> $code ($(wc -c < out/r.json) b)"
-            head -c 500 out/r.json; echo ""; echo "----"
-          done
-          echo "===== relacaoservidores com paginacao ====="
-          for qs in "?page=1&rows=5" "?exercicio=2026&page=1&rows=5"; do
-            code=$(api -o out/r.json -w "%{http_code}" --max-time 30 "$B/api/relacaoservidores$qs")
-            echo ">>> relacaoservidores$qs -> $code ($(wc -c < out/r.json) b)"
-            head -c 500 out/r.json; echo ""; echo "----"
+          echo "=== 4) Tentar dados novamente (com cookies do handshake) ==="
+          for p in "/api/remuneracaoportal/metadados" "/api/remuneracaoportal?page=1&rows=3" "/api/relacaoservidores?page=1&rows=3"; do
+            code=$(cj -H "Accept: application/json, text/plain, */*" -w "%{http_code}" --max-time 30 "$B$p" -o /tmp/d.json)
+            echo ">>> $p -> $code ($(wc -c < /tmp/d.json) b)"
+            head -c 500 /tmp/d.json; echo ""; echo "----"
           done
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: sonda-api
-          path: out/
-          if-no-files-found: ignore
+          echo "=== 5) Cookies finais no jar ==="
+          cat $J | grep -v '^#' || echo "(jar vazio)"
