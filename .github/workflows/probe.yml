@@ -1,0 +1,114 @@
+name: Sonda portais RG
+
+# Investigacao completa dos portais de transparencia de Rio Grande/RS, para
+# verificar se ha como capturar os dados diretamente da Prefeitura (alem do
+# SICONFI). Roda nos servidores do GitHub (internet livre). Temporario.
+
+on:
+  push:
+    branches: [claude/beautiful-maxwell-a2p6pf]
+    paths: ['.github/workflows/probe.yml']
+  workflow_dispatch:
+
+jobs:
+  sonda:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Investigar os tres portais
+        run: |
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+          H_ACCEPT="text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"
+          mkdir -p out
+          hdr() {
+            curl -s --compressed -A "$UA" \
+              -H "Accept: $H_ACCEPT" \
+              -H "Accept-Language: pt-BR,pt;q=0.9,en;q=0.8" \
+              -H "sec-ch-ua: \"Chromium\";v=\"126\", \"Google Chrome\";v=\"126\"" \
+              -H "sec-ch-ua-platform: \"Windows\"" \
+              -H "Upgrade-Insecure-Requests: 1" \
+              -c out/cookies.txt -b out/cookies.txt "$@"
+          }
+
+          echo "########## A) transparencia.riogrande.rs.gov.br (seguindo redirect) ##########"
+          curl -sL -A "$UA" -o out/transp.html -w "FINAL_URL=%{url_effective}  HTTP=%{http_code}\n" --max-time 40 "https://transparencia.riogrande.rs.gov.br/" || true
+          echo "--- tamanho:" $(wc -c < out/transp.html 2>/dev/null) "bytes"
+          echo "--- links/scripts na pagina ---"
+          grep -oE '(href|src)="[^"]+"' out/transp.html 2>/dev/null | sort -u | head -60 || true
+
+          echo ""
+          echo "########## B) GRP com cabecalhos de navegador real ##########"
+          for path in \
+            "https://grp.riogrande.rs.gov.br/transparencia/prefeitura/" \
+            "https://grp.riogrande.rs.gov.br/transparencia/prefeitura/index.html" \
+            "https://grp.riogrande.rs.gov.br/transparencia/" \
+            "https://grp.riogrande.rs.gov.br/" ; do
+            code=$(hdr -o /tmp/g.html -w "%{http_code}" --max-time 40 "$path" || echo ERR)
+            echo "HTTP $code  $path  ($(wc -c < /tmp/g.html 2>/dev/null) bytes)"
+            if [ "$code" = "200" ]; then cp /tmp/g.html out/grp_ok.html; fi
+          done
+          if [ -f out/grp_ok.html ]; then
+            echo "--- GRP carregou! scripts referenciados ---"
+            grep -oE 'src="[^"]+"' out/grp_ok.html | sort -u
+            echo "--- procura base de API embutida no HTML ---"
+            grep -oE '(apiUrl|baseUrl|API_URL|/api[^"'"'"' ]*|servico[^"'"'"' ]*)' out/grp_ok.html | sort -u | head || true
+          fi
+
+          echo ""
+          echo "########## C) Site institucional consulta (200 antes) ##########"
+          hdr -o out/consulta.html -w "HTTP=%{http_code}\n" --max-time 40 "https://www.riogrande.rs.gov.br/consulta/index.php/portal-transparencia" || true
+          echo "--- links para dados/sistemas ---"
+          grep -oiE 'href="[^"]*(transparenc|dados|csv|xls|api|grp|receita|despesa|licita)[^"]*"' out/consulta.html 2>/dev/null | sort -u | head -40 || true
+
+      - name: Baixar bundles JS do GRP e extrair endpoints de API
+        run: |
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+          dl() { curl -s --compressed -A "$UA" -H "Accept-Language: pt-BR" -c out/cookies.txt -b out/cookies.txt "$@"; }
+          if [ ! -f out/grp_ok.html ]; then echo "GRP nao carregou HTML; pulando."; exit 0; fi
+          mkdir -p out/js
+          i=0
+          for s in $(grep -oE 'src="[^"]+\.js[^"]*"' out/grp_ok.html | sed 's/src="//; s/"$//'); do
+            i=$((i+1))
+            case "$s" in
+              http*) url="$s" ;;
+              /*)    url="https://grp.riogrande.rs.gov.br$s" ;;
+              *)     url="https://grp.riogrande.rs.gov.br/transparencia/prefeitura/$s" ;;
+            esac
+            echo "Baixando bundle: $url"
+            dl --max-time 60 "$url" -o "out/js/$i.js" || true
+          done
+          echo "=== Padroes de endpoint encontrados nos bundles ==="
+          grep -ohE '"[^"]*(api|rest|servico|service|consulta|receita|despesa|licita|empenho|pessoal)[^"]*"' out/js/*.js 2>/dev/null | sort -u | head -120 || true
+          echo "=== URLs absolutas nos bundles ==="
+          grep -ohE 'https?://[a-zA-Z0-9.:/_-]+' out/js/*.js 2>/dev/null | sort -u | head -40 || true
+
+      - name: Testar endpoints candidatos de API do GRP
+        run: |
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+          api() {
+            curl -s --compressed -A "$UA" \
+              -H "Accept: application/json, text/plain, */*" \
+              -H "Accept-Language: pt-BR" \
+              -H "Referer: https://grp.riogrande.rs.gov.br/transparencia/prefeitura/" \
+              -H "X-Requested-With: XMLHttpRequest" \
+              -c out/cookies.txt -b out/cookies.txt "$@"
+          }
+          echo "=== Testando caminhos REST comuns de portais GRP municipais ==="
+          for p in \
+            "/transparencia/prefeitura/api/exercicios" \
+            "/transparencia/api/exercicios" \
+            "/api/transparencia/exercicios" \
+            "/transparencia/prefeitura/rest/receita" \
+            "/transparencia/services/receita" \
+            "/transparencia/ws/receita" \
+            "/transparencia/dados/receita" \
+            "/api/v1/receita" ; do
+            out=$(api -o /tmp/r.json -w "%{http_code} %{content_type}" --max-time 25 "https://grp.riogrande.rs.gov.br$p" || echo ERR)
+            echo "$out  $p  ($(wc -c < /tmp/r.json 2>/dev/null) bytes)"
+            head -c 200 /tmp/r.json 2>/dev/null; echo ""
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sonda-portais
+          path: out/
+          if-no-files-found: ignore
