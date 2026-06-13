@@ -1,8 +1,7 @@
 name: Sonda portais RG
 
-# Investiga a fundo transparencia.riogrande.rs.gov.br (app AngularJS que
-# CARREGA, sem WAF) e riogrande.ccanet.com.br/transparencia. Objetivo:
-# achar as APIs REST que alimentam esses portais. Temporario.
+# Testa a API REAL do portal de pessoal rhsysportaltransp (sem WAF) e le os
+# controllers para descobrir os parametros. Temporario.
 
 on:
   push:
@@ -14,68 +13,60 @@ jobs:
   sonda:
     runs-on: ubuntu-latest
     steps:
-      - name: Mapear transparencia.riogrande (AngularJS)
+      - name: Ler controllers (parametros das chamadas)
         run: |
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+          B="https://transparencia.riogrande.rs.gov.br/rhsysportaltransp"
           G() { curl -s --compressed -A "$UA" -H "Accept-Language: pt-BR" "$@"; }
-          mkdir -p out/js
-
-          echo "=== destino final do redirect ==="
-          G -sL -o out/index.html -w "FINAL=%{url_effective}\nHTTP=%{http_code}\nSIZE=%{size_download}\n" --max-time 40 "https://transparencia.riogrande.rs.gov.br/"
-          BASE=$(G -sLI -o /dev/null -w "%{url_effective}" --max-time 40 "https://transparencia.riogrande.rs.gov.br/")
-          BASE="${BASE%/}"; echo "BASE detectada: $BASE"
-
-          echo "=== todos os scripts referenciados ==="
-          grep -oE 'src="[^"]+\.js[^"]*"' out/index.html | sed 's/src="//;s/"$//' | sort -u | tee out/scripts.txt
-
-          echo "=== baixando controllers + services e procurando APIs ==="
-          i=0
-          while read -r s; do
-            [ -z "$s" ] && continue
-            i=$((i+1))
-            case "$s" in
-              http*) url="$s" ;;
-              /*)    url="https://transparencia.riogrande.rs.gov.br$s" ;;
-              *)     url="$BASE/$s" ;;
-            esac
-            G --max-time 40 "$url" -o "out/js/$i.js" || true
-          done < out/scripts.txt
-          echo "--- chamadas \$http / endpoints nos JS ---"
-          grep -ohE "(\\\$http|\\.get|\\.post)\(['\"][^'\"]+['\"]" out/js/*.js 2>/dev/null | sort -u | head -80 || true
-          echo "--- strings com cara de rota de API ---"
-          grep -ohE "['\"][a-zA-Z0-9_./-]*(api|rest|service|ws|consulta|receita|despesa|servidor|remunera|licita|empenho|dados)[a-zA-Z0-9_./-]*['\"]" out/js/*.js 2>/dev/null | sort -u | head -120 || true
-          echo "--- URLs absolutas ---"
-          grep -ohE 'https?://[a-zA-Z0-9.:/_-]+' out/js/*.js 2>/dev/null | sort -u | head -40 || true
-          echo "--- arquivos de config (appsettings/environment) ---"
-          grep -ohE "(baseUrl|apiUrl|urlApi|endpoint|webApi)[\"']?\s*[:=]\s*[\"'][^\"']+[\"']" out/js/*.js 2>/dev/null | sort -u | head -40 || true
-
-      - name: Testar API do transparencia.riogrande
-        run: |
-          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-          api() { curl -s --compressed -A "$UA" -H "Accept: application/json, text/plain, */*" -H "Accept-Language: pt-BR" -H "Referer: https://transparencia.riogrande.rs.gov.br/" "$@"; }
-          for p in \
-            "/api/exercicios" "/api/receita" "/api/despesa" "/api/servidores" \
-            "/service/exercicios" "/services/exercicios" \
-            "/ws/exercicios" "/rest/exercicios" \
-            "/api/parametros" "/api/entidades" "/api/configuracoes" ; do
-            out=$(api -o /tmp/r.json -w "%{http_code} %{content_type}" --max-time 25 "https://transparencia.riogrande.rs.gov.br$p" || echo ERR)
-            echo "$out  $p  ($(wc -c < /tmp/r.json 2>/dev/null) b)"
-            head -c 160 /tmp/r.json 2>/dev/null; echo ""
+          for c in relacaoservidores/relacaoservidores.controller.js remuneracaoportal/remuneracaoportal.controller.js services/services.module.js; do
+            echo "===================== $c ====================="
+            G --max-time 40 "$B/$c?v=4.3.1" | tr ';' '\n' | grep -iE "api/|\\\$http|params|exercicio|competenc|mes|ano|page|rows|filtro" | head -40 || true
           done
 
-      - name: Investigar ccanet
+      - name: Testar a API real (base /rhsysportaltransp/api)
         run: |
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-          G() { curl -s --compressed -A "$UA" -H "Accept-Language: pt-BR" "$@"; }
-          echo "=== ccanet transparencia ==="
-          G -sL -o out/cca.html -w "FINAL=%{url_effective} HTTP=%{http_code} SIZE=%{size_download}\n" --max-time 40 "http://riogrande.ccanet.com.br/transparencia" || true
-          echo "--- links/forms/scripts ---"
-          grep -oiE '(href|action|src)="[^"]+"' out/cca.html 2>/dev/null | sort -u | head -60 || true
-          echo "--- procura export CSV/XLS/JSON ---"
-          grep -oiE 'href="[^"]*(csv|xls|json|export|download|arquivo)[^"]*"' out/cca.html 2>/dev/null | sort -u | head -30 || true
+          B="https://transparencia.riogrande.rs.gov.br/rhsysportaltransp"
+          api() { curl -s --compressed -A "$UA" -H "Accept: application/json, text/plain, */*" -H "Accept-Language: pt-BR" -H "Referer: $B/" "$@"; }
+          mkdir -p out
+          for p in \
+            "/api/traducao" \
+            "/api/remuneracaoportal/metadados" \
+            "/api/filtros/" \
+            "/api/lov/" \
+            "/api/relacaoservidores" \
+            "/api/relacaoservidores/folha" \
+            "/api/remuneracaoportal" \
+            "/api/consultadiarias" ; do
+            code=$(api -o "out/resp.json" -w "%{http_code} %{content_type}" --max-time 30 "$B$p")
+            echo ">>> $p  -> $code  ($(wc -c < out/resp.json) bytes)"
+            head -c 700 out/resp.json; echo ""; echo "----"
+          done
+
+      - name: Testar remuneracaoportal com parametros comuns
+        run: |
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+          B="https://transparencia.riogrande.rs.gov.br/rhsysportaltransp"
+          api() { curl -s --compressed -A "$UA" -H "Accept: application/json, text/plain, */*" -H "Referer: $B/" "$@"; }
+          for qs in \
+            "?page=1&rows=5" \
+            "?competencia=202604&page=1&rows=5" \
+            "?anoMes=202604&page=1&rows=5" \
+            "?exercicio=2026&mes=4&page=1&rows=5" \
+            "?ano=2026&mes=4&page=1&rows=5" ; do
+            code=$(api -o out/r.json -w "%{http_code}" --max-time 30 "$B/api/remuneracaoportal$qs")
+            echo ">>> remuneracaoportal$qs -> $code ($(wc -c < out/r.json) b)"
+            head -c 500 out/r.json; echo ""; echo "----"
+          done
+          echo "===== relacaoservidores com paginacao ====="
+          for qs in "?page=1&rows=5" "?exercicio=2026&page=1&rows=5"; do
+            code=$(api -o out/r.json -w "%{http_code}" --max-time 30 "$B/api/relacaoservidores$qs")
+            echo ">>> relacaoservidores$qs -> $code ($(wc -c < out/r.json) b)"
+            head -c 500 out/r.json; echo ""; echo "----"
+          done
 
       - uses: actions/upload-artifact@v4
         with:
-          name: sonda-portais2
+          name: sonda-api
           path: out/
           if-no-files-found: ignore
